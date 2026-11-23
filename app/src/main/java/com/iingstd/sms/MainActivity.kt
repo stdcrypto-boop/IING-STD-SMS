@@ -302,14 +302,22 @@ class MainActivity : Activity() {
             var error = false
             try {
                 val seen = HashSet<String>()
+                val unreadKeys = HashSet<String>()
                 contentResolver.query(Telephony.Sms.CONTENT_URI,
                     arrayOf("address", "body", "date", "read", "type"), null, null, "date DESC")?.use { cursor ->
                     while (cursor.moveToNext()) {
                         val address = cursor.getString(0) ?: "Tidak dikenal"
-                        if (!seen.add(keyFor(address))) continue
+                        val key = keyFor(address)
+                        if (cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0) unreadKeys.add(key)
+                        if (!seen.add(key)) continue
                         conversations.add(Conversation(address, cursor.getString(1).orEmpty(),
                             cursor.getLong(2), cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0))
                     }
+                }
+                for (i in conversations.indices) {
+                    val item = conversations[i]
+                    if (unreadKeys.contains(keyFor(item.address)) && !item.unread)
+                        conversations[i] = item.copy(unread = true)
                 }
             } catch (_: Exception) { error = true }
             runOnUiThread {
