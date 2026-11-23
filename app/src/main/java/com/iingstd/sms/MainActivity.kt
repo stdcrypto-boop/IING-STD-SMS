@@ -23,6 +23,10 @@ import android.widget.*
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout
     private var refreshHint: TextView? = null
+    private var inboxScroll: ScrollView? = null
+    private var pullStartY = 0f
+    private var pullStartX = 0f
+    private var pullEligible = false
     private lateinit var defaultButton: Button
     private lateinit var selectionBar: LinearLayout
     private lateinit var selectionLabel: TextView
@@ -164,49 +168,58 @@ class MainActivity : Activity() {
         }
         refreshHint = hint
         root.addView(hint)
-        var pullStartY = 0f
-        var pulling = false
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            setOnTouchListener { view, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> {
-                        pullStartY = event.y
-                        pulling = scrollY == 0
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        if (pulling && scrollY == 0) {
-                            val distance = event.y - pullStartY
-                            hint.visibility = if (distance > dp(32)) View.VISIBLE else View.GONE
-                            hint.text = if (distance > dp(90)) "↑ Lepaskan untuk refresh" else "↓ Tarik untuk refresh"
-                        } else {
-                            hint.visibility = View.GONE
-                        }
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        if (pulling && scrollY == 0 && event.y - pullStartY > dp(90)) {
-                            hint.text = "⟳ Memuat percakapan…"
-                            hint.visibility = View.VISIBLE
-                            refresh()
-                        } else {
-                            hint.visibility = View.GONE
-                        }
-                        pulling = false
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        pulling = false
-                        hint.visibility = View.GONE
-                    }
-                }
-                false
-            }
-        }
+        val scroll = ScrollView(this).apply { isFillViewport = true }
+        inboxScroll = scroll
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(list)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         updateDefaultButton()
         requestNextPermission()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val scroll = inboxScroll
+        if (scroll != null) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    val location = IntArray(2)
+                    scroll.getLocationOnScreen(location)
+                    val rawY = event.rawY
+                    pullEligible = rawY >= location[1] && rawY <= location[1] + scroll.height &&
+                        scroll.scrollY == 0 && !deleting
+                    pullStartY = rawY
+                    pullStartX = event.rawX
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (pullEligible && scroll.scrollY == 0) {
+                        val dy = event.rawY - pullStartY
+                        val dx = kotlin.math.abs(event.rawX - pullStartX)
+                        if (dx > dp(65) && dx > kotlin.math.abs(dy)) pullEligible = false
+                        else {
+                            refreshHint?.visibility = if (dy > dp(12)) View.VISIBLE else View.GONE
+                            refreshHint?.text = if (dy >= dp(48)) "↑ Lepaskan untuk refresh" else "↓ Tarik untuk refresh"
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    val dy = event.rawY - pullStartY
+                    val dx = kotlin.math.abs(event.rawX - pullStartX)
+                    if (pullEligible && scroll.scrollY == 0 && dy >= dp(48) &&
+                        dx < kotlin.math.abs(dy)) {
+                        refreshHint?.text = "⟳ Memuat percakapan…"
+                        refreshHint?.visibility = View.VISIBLE
+                        refresh()
+                    } else refreshHint?.visibility = View.GONE
+                    pullEligible = false
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    pullEligible = false
+                    refreshHint?.visibility = View.GONE
+                }
+            }
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onDestroy() {
