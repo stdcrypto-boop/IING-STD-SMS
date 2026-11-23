@@ -212,7 +212,7 @@ class ComposeActivity : Activity() {
     private fun loadHistory(address:String,layout:LinearLayout) {
         layout.removeAllViews()
         if(address.isBlank() || checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
-        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("address","body","type","date"),null,null,"date ASC")?.use { c ->
+        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("address","body","type","date","error_code"),null,null,"date ASC")?.use { c ->
             while(c.moveToNext()) {
                 if (normalized(c.getString(0).orEmpty()) != normalized(address)) continue
                 val outgoing = c.getInt(2) != Telephony.Sms.MESSAGE_TYPE_INBOX
@@ -220,7 +220,7 @@ class ComposeActivity : Activity() {
                 val date = DateFormat.format("HH:mm", c.getLong(3)).toString()
                 val status = when (c.getInt(2)) {
                     Telephony.Sms.MESSAGE_TYPE_SENT -> " • Terkirim"
-                    Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal"
+                    Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal (kode ${c.getInt(4)})"
                     Telephony.Sms.MESSAGE_TYPE_OUTBOX -> " • Mengirim"
                     else -> ""
                 }
