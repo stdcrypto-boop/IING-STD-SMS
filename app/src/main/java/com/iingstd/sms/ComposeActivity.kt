@@ -65,12 +65,22 @@ class ComposeActivity : Activity() {
             simChoices.add("SIM default Android" to SubscriptionManager.getDefaultSmsSubscriptionId())
         }
         simSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, simChoices.map { it.first })
+        val defaultSimIndex = simChoices.indexOfFirst { it.second == SubscriptionManager.getDefaultSmsSubscriptionId() }
+        if (defaultSimIndex >= 0) simSpinner.setSelection(defaultSimIndex)
         root.addView(simSpinner)
         val history=ScrollView(this)
         val messages=LinearLayout(this).apply { orientation=1 }
         history.addView(messages)
         messageList = messages
         currentAddress = number.text.toString().trim()
+        number.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                currentAddress = s?.toString()?.trim().orEmpty()
+                loadHistory(currentAddress, messages)
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis SMS..."; minLines=2; maxLines=5 }
         root.addView(body)
