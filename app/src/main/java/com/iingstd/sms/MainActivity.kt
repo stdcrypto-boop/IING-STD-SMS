@@ -414,7 +414,7 @@ class MainActivity : Activity() {
             }
         }
         row.addView(TextView(this).apply {
-            text = address.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+            text = (contactNames[keyFor(address)] ?: address).firstOrNull()?.uppercaseChar()?.toString() ?: "?"
             textSize = 20f; setTypeface(null, Typeface.BOLD)
             setTextColor(blue); gravity = Gravity.CENTER
             background = rounded(Color.rgb(36, 65, 62), 50)
@@ -424,7 +424,7 @@ class MainActivity : Activity() {
             setPadding(dp(12), 0, dp(8), 0)
         }
         info.addView(TextView(this).apply {
-            text = address; textSize = 16f; setTypeface(null, if (unread) Typeface.BOLD else Typeface.NORMAL)
+            text = contactNames[keyFor(address)] ?: address; textSize = 16f; setTypeface(null, if (unread) Typeface.BOLD else Typeface.NORMAL)
             setTextColor(Color.WHITE)
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         })
