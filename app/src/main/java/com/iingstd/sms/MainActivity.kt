@@ -7,81 +7,181 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
+import android.text.TextUtils
+import android.text.format.DateUtils
+import android.view.Gravity
 import android.view.View
 import android.widget.*
-import android.text.util.Linkify
 
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout
-    private val blue = Color.rgb(52, 91, 222)
+    private lateinit var defaultButton: Button
+    private val blue = Color.rgb(54, 91, 220)
+    private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
+        setColor(color); cornerRadius = dp(radius).toFloat()
+    }
+    private fun isDefaultSms(): Boolean =
+        Telephony.Sms.getDefaultSmsPackage(this) == packageName
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = 1; setPadding(20, 30, 20, 12); setBackgroundColor(Color.rgb(247,249,255)) }
-        val title = TextView(this).apply { text = "IING STD SMS"; textSize = 27f; setTextColor(blue); setTypeface(null,Typeface.BOLD) }
-        root.addView(title)
-        val button = Button(this).apply { text = "Jadikan aplikasi SMS utama"; setOnClickListener { requestDefault() } }
-        root.addView(button)
-        val newMessage = Button(this).apply { text = "＋ Pesan baru"; setOnClickListener { startActivity(Intent(this@MainActivity, ComposeActivity::class.java)) } }
-        root.addView(newMessage)
-        val scroll = ScrollView(this)
-        list = LinearLayout(this).apply { orientation = 1 }
+        window.statusBarColor = Color.rgb(248, 250, 255)
+        window.navigationBarColor = Color.rgb(248, 250, 255)
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(12))
+            setBackgroundColor(Color.rgb(248, 250, 255))
+        }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        header.addView(TextView(this).apply {
+            text = "Pesan"; textSize = 30f; setTextColor(Color.rgb(25, 35, 60))
+            setTypeface(null, Typeface.BOLD)
+        })
+        header.addView(TextView(this).apply {
+            text = "IING STD SMS"; textSize = 12f; setTextColor(blue)
+            letterSpacing = .12f; setPadding(0, 0, 0, dp(12))
+        })
+        root.addView(header)
+        defaultButton = Button(this).apply {
+            text = "Aktifkan sebagai aplikasi SMS utama"
+            isAllCaps = false
+            setOnClickListener { requestDefault() }
+        }
+        root.addView(defaultButton, LinearLayout.LayoutParams(-1, dp(52)))
+        val section = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, dp(10))
+        }
+        section.addView(TextView(this).apply {
+            text = "Percakapan"; textSize = 17f
+            setTextColor(Color.rgb(36, 45, 67))
+            setTypeface(null, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        section.addView(TextView(this).apply {
+            text = "＋  Baru"; textSize = 15f
+            setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setTypeface(null, Typeface.BOLD)
+            background = rounded(blue, 22)
+            setOnClickListener { startActivity(Intent(this@MainActivity, ComposeActivity::class.java)) }
+        }, LinearLayout.LayoutParams(dp(100), dp(44)))
+        root.addView(section)
+        val scroll = ScrollView(this).apply { isFillViewport = true }
+        list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(list)
-        root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
+        updateDefaultButton()
         requestNextPermission()
     }
+
     override fun onResume() {
         super.onResume()
-        if (::list.isInitialized && checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) refresh()
+        if (::defaultButton.isInitialized) updateDefaultButton()
+        if (::list.isInitialized) refresh()
+    }
+    private fun updateDefaultButton() {
+        defaultButton.visibility = if (isDefaultSms()) View.GONE else View.VISIBLE
     }
     private fun requestNextPermission() {
+        // Ask for SMS access only after Android grants this app the default SMS role.
+        if (!isDefaultSms()) return
         val required = listOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS)
-        val missingSms = required.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-        if (missingSms.isNotEmpty()) {
-            requestPermissions(missingSms.toTypedArray(), 1)
-            return
-        }
+        val missing = required.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) { requestPermissions(missing.toTypedArray(), 1); return }
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4)
-            return
         }
+    }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if ((requestCode == 1 || requestCode == 4) && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) requestNextPermission()
         refresh()
     }
-    override fun onRequestPermissionsResult(requestCode:Int, permissions:Array<out String>, grantResults:IntArray) {
-        super.onRequestPermissionsResult(requestCode,permissions,grantResults)
-        if ((requestCode == 1 || requestCode == 4) && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) requestNextPermission()
-        else if (::list.isInitialized) refresh()
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 2) { updateDefaultButton(); if (isDefaultSms()) requestNextPermission(); refresh() }
     }
     private fun requestDefault() {
+        if (isDefaultSms()) { updateDefaultButton(); return }
         if (Build.VERSION.SDK_INT >= 29) {
             val role = getSystemService(RoleManager::class.java)
-            if (role.isRoleAvailable(RoleManager.ROLE_SMS) && !role.isRoleHeld(RoleManager.ROLE_SMS))
-                startActivityForResult(role.createRequestRoleIntent(RoleManager.ROLE_SMS),2)
-        } else startActivityForResult(Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME,packageName),2)
+            if (role.isRoleAvailable(RoleManager.ROLE_SMS))
+                startActivityForResult(role.createRequestRoleIntent(RoleManager.ROLE_SMS), 2)
+            else Toast.makeText(this, "Peran SMS tidak tersedia", Toast.LENGTH_SHORT).show()
+        } else {
+            startActivityForResult(Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+                .putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName), 2)
+        }
     }
     private fun refresh() {
         list.removeAllViews()
-        if (checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
+        if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            list.addView(TextView(this).apply {
+                text = "Izin membaca SMS belum tersedia."
+                textSize = 15f; setTextColor(Color.DKGRAY); setPadding(dp(8), dp(24), 0, 0)
+            })
+            return
+        }
         val seen = mutableSetOf<String>()
         try {
-            contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("address","body","date"),null,null,"date DESC")?.use { c ->
-                while(c.moveToNext()) {
-                    val address = c.getString(0) ?: "Tidak dikenal"
-                    if(!seen.add(address)) continue
-                    val body = c.getString(1) ?: ""
-                    val item = TextView(this).apply {
-                        text = "$address\n$body"; textSize=17f; setTextColor(Color.rgb(30,40,65))
-                        setPadding(18,20,18,20); maxLines=3
-                        setOnClickListener { startActivity(Intent(this@MainActivity,ComposeActivity::class.java).putExtra("address",address)) }
-                    }
-                    list.addView(item)
-                    list.addView(View(this).apply { setBackgroundColor(Color.LTGRAY) },LinearLayout.LayoutParams(-1,1))
+            contentResolver.query(Telephony.Sms.CONTENT_URI,
+                arrayOf("address", "body", "date"), null, null, "date DESC")?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val address = cursor.getString(0) ?: "Tidak dikenal"
+                    if (!seen.add(address)) continue
+                    val body = cursor.getString(1).orEmpty()
+                    val date = cursor.getLong(2)
+                    addConversation(address, body, date)
                 }
             }
-        } catch (e: SecurityException) { Toast.makeText(this,"Izin SMS diperlukan",Toast.LENGTH_SHORT).show() }
+            if (seen.isEmpty()) list.addView(TextView(this).apply {
+                text = "Belum ada percakapan. Ketuk + Baru untuk menulis pesan."
+                textSize = 15f; setPadding(dp(8), dp(30), dp(8), 0)
+            })
+        } catch (_: SecurityException) {
+            Toast.makeText(this, "Izin SMS diperlukan", Toast.LENGTH_SHORT).show()
+        }
+    }
+    private fun addConversation(address: String, body: String, date: Long) {
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(14), dp(12), dp(14))
+            background = rounded(Color.WHITE, 18)
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
+            }
+        }
+        row.addView(TextView(this).apply {
+            text = address.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+            textSize = 20f; setTypeface(null, Typeface.BOLD)
+            setTextColor(blue); gravity = Gravity.CENTER
+            background = rounded(Color.rgb(231, 237, 255), 50)
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, dp(8), 0)
+        }
+        info.addView(TextView(this).apply {
+            text = address; textSize = 16f; setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(29, 39, 61))
+            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+        })
+        info.addView(TextView(this).apply {
+            text = body; textSize = 14f; setTextColor(Color.rgb(111, 121, 141))
+            maxLines = 2; ellipsize = TextUtils.TruncateAt.END
+        })
+        row.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(TextView(this).apply {
+            text = DateUtils.getRelativeTimeSpanString(date, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+            textSize = 11f; setTextColor(Color.GRAY); maxLines = 1
+        })
+        list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
     }
 }
