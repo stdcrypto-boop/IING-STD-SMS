@@ -74,11 +74,19 @@ class ComposeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         window.statusBarColor = Color.rgb(231,239,255)
         window.navigationBarColor = Color.rgb(248,247,255)
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         val root = LinearLayout(this).apply { orientation=1; setPadding(dp(16),dp(12),dp(16),dp(12)); background=shape(Color.rgb(234,242,255),Color.rgb(250,245,255),0) }
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener { view, insets ->
+                val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
+                val nav = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+                val bottom = if (insets.isVisible(WindowInsets.Type.ime())) ime else nav
+                view.setPadding(dp(16),dp(12),dp(16),bottom + dp(12))
+                insets
+            }
+        }
         val header=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(15),dp(18),dp(15)); background=shape(Color.rgb(209,226,255),Color.rgb(235,223,255)) }
         header.addView(TextView(this).apply { text="‹  Percakapan"; textSize=23f; setTypeface(null,Typeface.BOLD); setTextColor(Color.rgb(35,54,108)); setOnClickListener { finish() } })
         header.addView(TextView(this).apply { text="IING STD SMS  •  Pesan pribadi"; textSize=12f; setTextColor(Color.rgb(80,99,155)) })
@@ -177,7 +185,7 @@ class ComposeActivity : Activity() {
                         putExtra("token",token)
                         putExtra("part_count",parts.size)
                     }
-                    callbacks.add(PendingIntent.getBroadcast(this@ComposeActivity,0,callback,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                    callbacks.add(PendingIntent.getBroadcast(this@ComposeActivity,0,callback,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
                 }
                 if(parts.size>1) manager.sendMultipartTextMessage(to,null,parts,callbacks,null)
                 else manager.sendTextMessage(to,null,message,callbacks.first(),null)
@@ -197,7 +205,7 @@ class ComposeActivity : Activity() {
                 loadHistory(to,messages)
             }
         } },LinearLayout.LayoutParams(-1,dp(54)))
-        root.addView(composer,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(64) })
+        root.addView(composer,LinearLayout.LayoutParams(-1,-2))
         setContentView(root)
         loadHistory(number.text.toString(),messages)
     }
