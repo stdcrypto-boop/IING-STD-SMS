@@ -12,6 +12,7 @@ import android.provider.Telephony
 import android.app.Notification
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 
 class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -38,7 +39,11 @@ class SmsReceiver : BroadcastReceiver() {
             manager.createNotificationChannel(NotificationChannel(channelId, "Pesan SMS", NotificationManager.IMPORTANCE_HIGH))
         }
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val open = Intent(context, ComposeActivity::class.java).putExtra("address", sender)
+        val open = Intent(context, ComposeActivity::class.java).apply {
+            data = Uri.parse("iingsms://conversation/" + Uri.encode(sender))
+            putExtra("address", sender)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
         val pending = PendingIntent.getActivity(context, sender.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = Notification.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
