@@ -80,6 +80,7 @@ class ComposeActivity : Activity() {
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.SEND_SMS),3); return@setOnClickListener
             }
+            var outgoingUri: Uri? = null
             try {
                 if (Telephony.Sms.getDefaultSmsPackage(this@ComposeActivity) != packageName) {
                     Toast.makeText(this@ComposeActivity,"Jadikan IING STD SMS aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show()
@@ -99,6 +100,7 @@ class ComposeActivity : Activity() {
                 }
                 val uri = contentResolver.insert(Telephony.Sms.Outbox.CONTENT_URI,values)
                     ?: throw IllegalStateException("Tidak bisa menyimpan SMS")
+                outgoingUri = uri
                 val manager = if (Build.VERSION.SDK_INT >= 31) {
                     getSystemService(SmsManager::class.java).createForSubscriptionId(selectedId)
                 } else {
@@ -124,7 +126,17 @@ class ComposeActivity : Activity() {
                 Toast.makeText(this@ComposeActivity,"Mengirim SMS...",Toast.LENGTH_SHORT).show()
                 currentAddress = to
                 loadHistory(to,messages)
-            } catch(e: Exception) { Toast.makeText(this@ComposeActivity,"Gagal: ${e.message}",Toast.LENGTH_LONG).show() }
+            } catch(e: Exception) {
+                outgoingUri?.let { saved ->
+                    try {
+                        contentResolver.update(saved, ContentValues().apply {
+                            put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_FAILED)
+                        }, null, null)
+                    } catch (_: Exception) {}
+                }
+                Toast.makeText(this@ComposeActivity,"Gagal: ${e.message}",Toast.LENGTH_LONG).show()
+                loadHistory(to,messages)
+            }
         } })
         setContentView(root)
         loadHistory(number.text.toString(),messages)
