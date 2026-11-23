@@ -17,15 +17,17 @@ class SentReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences("sms_send_results",Context.MODE_PRIVATE)
         val completed = prefs.getInt("${token}_completed",0) + 1
         val failed = prefs.getBoolean("${token}_failed",false) || resultCode != Activity.RESULT_OK
+        val failureCode = if (resultCode != Activity.RESULT_OK) resultCode else prefs.getInt("${token}_error", 0)
         if (completed < total) {
-            prefs.edit().putInt("${token}_completed",completed).putBoolean("${token}_failed",failed).apply()
+            prefs.edit().putInt("${token}_completed",completed).putBoolean("${token}_failed",failed).putInt("${token}_error",failureCode).apply()
             return
         }
-        prefs.edit().remove("${token}_completed").remove("${token}_failed").apply()
+        prefs.edit().remove("${token}_completed").remove("${token}_failed").remove("${token}_error").apply()
         try {
             val uri = Uri.parse(messageUri)
             val values = ContentValues().apply {
                 put(Telephony.Sms.TYPE,if(failed) Telephony.Sms.MESSAGE_TYPE_FAILED else Telephony.Sms.MESSAGE_TYPE_SENT)
+                if (failed) put(Telephony.Sms.ERROR_CODE, failureCode)
             }
             context.contentResolver.update(uri,values,null,null)
         } catch (_: Exception) {
