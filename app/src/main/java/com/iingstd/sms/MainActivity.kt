@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
@@ -26,6 +27,15 @@ class MainActivity : Activity() {
         setColor(color); cornerRadius = dp(radius).toFloat()
     }
     private fun gradient(top: Int, bottom: Int, radius: Int = 0) = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(top, bottom)).apply { cornerRadius = dp(radius).toFloat() }
+    private fun conversationSurface(unread: Boolean): LayerDrawable {
+        val shadow = rounded(Color.argb(24, 49, 73, 140), 24)
+        val fill = gradient(if (unread) Color.rgb(207, 227, 255) else Color.WHITE,
+            if (unread) Color.rgb(236, 226, 255) else Color.rgb(246, 248, 255), 22)
+        fill.setStroke(dp(if (unread) 2 else 1), if (unread) Color.rgb(119, 145, 235) else Color.rgb(225, 232, 248))
+        return LayerDrawable(arrayOf(shadow, fill)).apply {
+            setLayerInset(1, 0, 0, dp(2), dp(3))
+        }
+    }
     private fun isDefaultSms(): Boolean =
         Telephony.Sms.getDefaultSmsPackage(this) == packageName
 
@@ -158,8 +168,9 @@ class MainActivity : Activity() {
     private fun addConversation(address: String, body: String, date: Long, unread: Boolean) {
         val row = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(14), dp(12), dp(14))
-            background = if (unread) gradient(Color.rgb(205, 225, 255), Color.rgb(233, 224, 255), 18) else gradient(Color.WHITE, Color.rgb(249, 248, 255), 18)
+            setPadding(dp(14), dp(16), dp(14), dp(17))
+            background = conversationSurface(unread)
+            elevation = dp(2).toFloat()
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
             }
@@ -191,6 +202,6 @@ class MainActivity : Activity() {
             text = DateUtils.getRelativeTimeSpanString(date, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
             textSize = 11f; setTextColor(Color.GRAY); maxLines = 1
         })
-        list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
     }
 }
