@@ -28,6 +28,8 @@ class MainActivity : Activity() {
     private val visibleConversations = mutableSetOf<String>()
     private var selectionMode = false
     private var deleting = false
+    private var refreshGeneration = 0
+    private data class Conversation(val address: String, val body: String, val date: Long, val unread: Boolean)
     private val blue = Color.rgb(37, 211, 102)
     private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
@@ -159,6 +161,10 @@ class MainActivity : Activity() {
         requestNextPermission()
     }
 
+    override fun onDestroy() {
+        refreshGeneration++
+        super.onDestroy()
+    }
     override fun onResume() {
         super.onResume()
         if (::defaultButton.isInitialized) updateDefaultButton()
@@ -200,38 +206,51 @@ class MainActivity : Activity() {
         }
     }
     private fun refresh() {
-        list.removeAllViews()
-        visibleConversations.clear()
+        val generation = ++refreshGeneration
         if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            list.removeAllViews()
             list.addView(TextView(this).apply {
                 text = "Izin membaca SMS belum tersedia."
                 textSize = 15f; setTextColor(Color.WHITE); setPadding(dp(8), dp(24), 0, 0)
             })
             return
         }
-        val seen = mutableSetOf<String>()
-        try {
-            contentResolver.query(Telephony.Sms.CONTENT_URI,
-                arrayOf("address", "body", "date", "read", "type"), null, null, "date DESC")?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val address = cursor.getString(0) ?: "Tidak dikenal"
-                    if (!seen.add(keyFor(address))) continue
-                    visibleConversations.add(keyFor(address))
-                    val body = cursor.getString(1).orEmpty()
-                    val date = cursor.getLong(2)
-                    val unread = cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0
-                    addConversation(address, body, date, unread)
+        // Read the SMS provider off the UI thread. Rebuild views only for the latest result.
+        Thread {
+            val conversations = mutableListOf<Conversation>()
+            var error = false
+            try {
+                val seen = HashSet<String>()
+                contentResolver.query(Telephony.Sms.CONTENT_URI,
+                    arrayOf("address", "body", "date", "read", "type"), null, null, "date DESC")?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val address = cursor.getString(0) ?: "Tidak dikenal"
+                        if (!seen.add(keyFor(address))) continue
+                        conversations.add(Conversation(address, cursor.getString(1).orEmpty(),
+                            cursor.getLong(2), cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0))
+                    }
                 }
+            } catch (_: Exception) { error = true }
+            runOnUiThread {
+                if (isFinishing || isDestroyed || generation != refreshGeneration) return@runOnUiThread
+                if (error) {
+                    Toast.makeText(this@MainActivity, "Gagal memuat SMS", Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+                list.removeAllViews()
+                visibleConversations.clear()
+                conversations.forEach { conversation ->
+                    visibleConversations.add(keyFor(conversation.address))
+                    addConversation(conversation.address, conversation.body, conversation.date, conversation.unread)
+                }
+                if (conversations.isEmpty()) list.addView(TextView(this).apply {
+                    text = "Belum ada percakapan. Ketuk + Baru untuk menulis pesan."
+                    textSize = 15f; setTextColor(Color.WHITE); setPadding(dp(8), dp(30), dp(8), 0)
+                })
+                selectedConversations.retainAll(visibleConversations)
+                updateSelectionBar()
             }
-            if (seen.isEmpty()) list.addView(TextView(this).apply {
-                text = "Belum ada percakapan. Ketuk + Baru untuk menulis pesan."
-                textSize = 15f; setTextColor(Color.WHITE); setPadding(dp(8), dp(30), dp(8), 0)
-            })
-        } catch (_: SecurityException) {
-            Toast.makeText(this, "Izin SMS diperlukan", Toast.LENGTH_SHORT).show()
-        }
-        selectedConversations.retainAll(visibleConversations)
-        updateSelectionBar()
+        }.start()
     }
     private fun updateSelectionBar() {
         if (!::selectionBar.isInitialized) return
