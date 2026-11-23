@@ -7,6 +7,8 @@ import android.content.ContentValues
 import android.net.Uri
 import java.util.UUID
 import android.app.Activity
+import android.app.role.RoleManager
+import android.graphics.Typeface
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
@@ -27,6 +29,25 @@ import android.text.format.DateFormat
 import android.widget.*
 
 class ComposeActivity : Activity() {
+    private fun dp(n:Int) = (n * resources.displayMetrics.density + .5f).toInt()
+    private fun shape(a:Int,b:Int,r:Int=22) = GradientDrawable(GradientDrawable.Orientation.TL_BR,intArrayOf(a,b)).apply { cornerRadius=dp(r).toFloat() }
+    private fun isSmsDefault(): Boolean {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val role = getSystemService(RoleManager::class.java)
+            if (role.isRoleAvailable(RoleManager.ROLE_SMS) && role.isRoleHeld(RoleManager.ROLE_SMS)) return true
+        }
+        return Telephony.Sms.getDefaultSmsPackage(this) == packageName
+    }
+    private fun requestSmsRole() {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val role = getSystemService(RoleManager::class.java)
+            if (role.isRoleAvailable(RoleManager.ROLE_SMS)) {
+                startActivityForResult(role.createRequestRoleIntent(RoleManager.ROLE_SMS), 22)
+                return
+            }
+        }
+        startActivityForResult(Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName),22)
+    }
     private var currentAddress = ""
     private var messageList: LinearLayout? = null
     private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -52,19 +73,19 @@ class ComposeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        val root = LinearLayout(this).apply { orientation=1; setPadding(22,30,22,22); setBackgroundColor(Color.rgb(247,249,255)) }
-        if (Build.VERSION.SDK_INT >= 30) {
-            root.setOnApplyWindowInsetsListener { view, insets ->
-                val bars = insets.getInsets(WindowInsets.Type.navigationBars())
-                val keyboard = insets.getInsets(WindowInsets.Type.ime())
-                view.setPadding(22,30,22,22 + maxOf(bars.bottom, keyboard.bottom))
-                insets
-            }
-        }
-        val header=TextView(this).apply { text="Percakapan"; textSize=26f; setTextColor(Color.rgb(52,91,222)); setPadding(0,0,0,18) }
-        root.addView(header)
+        window.statusBarColor = Color.rgb(231,239,255)
+        window.navigationBarColor = Color.rgb(248,247,255)
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        val root = LinearLayout(this).apply { orientation=1; setPadding(dp(16),dp(12),dp(16),dp(10)); background=shape(Color.rgb(234,242,255),Color.rgb(250,245,255),0) }
+        val header=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(15),dp(18),dp(15)); background=shape(Color.rgb(209,226,255),Color.rgb(235,223,255)) }
+        header.addView(TextView(this).apply { text="‹  Percakapan"; textSize=23f; setTypeface(null,Typeface.BOLD); setTextColor(Color.rgb(35,54,108)); setOnClickListener { finish() } })
+        header.addView(TextView(this).apply { text="IING STD SMS  •  Pesan pribadi"; textSize=12f; setTextColor(Color.rgb(80,99,155)) })
+        root.addView(header,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
         val number=EditText(this).apply { hint="Nomor tujuan"; setSingleLine(true); setText(intent.getStringExtra("address") ?: intent.data?.schemeSpecificPart ?: "") }
-        root.addView(number)
+        number.background=shape(Color.WHITE,Color.rgb(249,249,255),16)
+        number.setPadding(dp(14),dp(10),dp(14),dp(10))
+        number.textSize=16f
+        root.addView(number,LinearLayout.LayoutParams(-1,dp(52)).apply { bottomMargin=dp(8) })
         val simChoices = mutableListOf<Pair<String,Int>>()
         val simSpinner = Spinner(this)
         val subscriptionManager = getSystemService(SubscriptionManager::class.java)
@@ -81,7 +102,8 @@ class ComposeActivity : Activity() {
         simSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, simChoices.map { it.first })
         val defaultSimIndex = simChoices.indexOfFirst { it.second == SubscriptionManager.getDefaultSmsSubscriptionId() }
         if (defaultSimIndex >= 0) simSpinner.setSelection(defaultSimIndex)
-        root.addView(simSpinner)
+        simSpinner.background=shape(Color.rgb(245,247,255),Color.rgb(234,238,255),14)
+        root.addView(simSpinner,LinearLayout.LayoutParams(-1,dp(48)).apply { bottomMargin=dp(8) })
         if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             root.addView(Button(this).apply {
                 text = "Aktifkan pilihan SIM 1 / SIM 2"
@@ -103,10 +125,11 @@ class ComposeActivity : Activity() {
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
+        history.clipToPadding=false
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
-        val body=EditText(this).apply { hint="Tulis SMS..."; minLines=2; maxLines=5 }
-        root.addView(body)
-        root.addView(Button(this).apply { text="Kirim SMS"; minHeight = (56 * resources.displayMetrics.density).toInt(); setOnClickListener {
+        val body=EditText(this).apply { hint="Tulis pesan..."; minLines=1; maxLines=4; textSize=16f; background=shape(Color.WHITE,Color.rgb(250,249,255),18); setPadding(dp(15),dp(12),dp(15),dp(12)) }
+        root.addView(body,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8); bottomMargin=dp(8) })
+        root.addView(Button(this).apply { text="➤  Kirim pesan"; isAllCaps=false; textSize=16f; setTextColor(Color.WHITE); background=shape(Color.rgb(52,105,226),Color.rgb(120,78,211),18); minHeight=dp(54); setOnClickListener {
             val to=number.text.toString().trim(); val message=body.text.toString()
             if(to.isEmpty() || message.isBlank()) { Toast.makeText(this@ComposeActivity,"Isi nomor dan pesan",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED) {
@@ -114,8 +137,9 @@ class ComposeActivity : Activity() {
             }
             var outgoingUri: Uri? = null
             try {
-                if (Telephony.Sms.getDefaultSmsPackage(this@ComposeActivity) != packageName) {
-                    Toast.makeText(this@ComposeActivity,"Jadikan IING STD SMS aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show()
+                if (!isSmsDefault()) {
+                    Toast.makeText(this@ComposeActivity,"Android belum mengizinkan IING STD SMS sebagai SMS utama. Pilih aplikasi ini pada dialog berikut.",Toast.LENGTH_LONG).show()
+                    requestSmsRole()
                     return@setOnClickListener
                 }
                 val selectedId = simChoices[simSpinner.selectedItemPosition].second
@@ -169,7 +193,7 @@ class ComposeActivity : Activity() {
                 Toast.makeText(this@ComposeActivity,"Gagal: ${e.message}",Toast.LENGTH_LONG).show()
                 loadHistory(to,messages)
             }
-        } })
+        } },LinearLayout.LayoutParams(-1,dp(54)))
         setContentView(root)
         loadHistory(number.text.toString(),messages)
     }
@@ -189,13 +213,13 @@ class ComposeActivity : Activity() {
                 }
                 val bubble = GradientDrawable().apply {
                     setColor(if(outgoing) Color.rgb(211,226,255) else Color.WHITE)
-                    cornerRadius = 32f
+                    cornerRadius = dp(18).toFloat()
                 }
                 val item=TextView(this).apply {
                     text="$messageText\n$date$status"
                     textSize=16f
                     setTextColor(Color.rgb(25,35,55))
-                    setPadding(22,16,22,16)
+                    setPadding(dp(14),dp(11),dp(14),dp(11))
                     autoLinkMask=Linkify.WEB_URLS or Linkify.EMAIL_ADDRESSES or Linkify.PHONE_NUMBERS
                     linksClickable=true
                     movementMethod=android.text.method.LinkMovementMethod.getInstance()
@@ -203,7 +227,7 @@ class ComposeActivity : Activity() {
                 }
                 val row=LinearLayout(this).apply {
                     gravity=if(outgoing) Gravity.END else Gravity.START
-                    setPadding(0,5,0,5)
+                    setPadding(0,dp(5),0,dp(5))
                 }
                 row.addView(item,LinearLayout.LayoutParams(-2,-2).apply { width=LinearLayout.LayoutParams.WRAP_CONTENT })
                 layout.addView(row,LinearLayout.LayoutParams(-1,-2))
