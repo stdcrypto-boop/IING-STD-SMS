@@ -352,17 +352,34 @@ class ComposeActivity : Activity() {
         // Android's telephony number matcher handles local/international dialing formats.
         return PhoneNumberUtils.compare(a, b)
     }
+    private fun markConversationRead(address: String) {
+        if (!isSmsDefault() || address.isBlank()) return
+        Thread {
+            try {
+                contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI,
+                    arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS),
+                    "${Telephony.Sms.READ}=0", null, null)?.use { c ->
+                    while (c.moveToNext()) {
+                        if (sameSmsAddress(c.getString(1).orEmpty(), address)) {
+                            contentResolver.update(android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, c.getLong(0)),
+                                ContentValues().apply { put(Telephony.Sms.READ, 1); put(Telephony.Sms.SEEN, 1) }, null, null)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }.start()
+    }
     private fun loadHistory(address:String,layout:LinearLayout) {
         layout.removeAllViews()
         if(address.isBlank() || checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
-        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("_id","address","body","type","date","error_code"),null,null,"date ASC")?.use { c ->
+        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("_id","address","body","type","date","error_code","status"),null,null,"date ASC")?.use { c ->
             while(c.moveToNext()) {
                 if (!sameSmsAddress(c.getString(1).orEmpty(), address)) continue
                 val outgoing = c.getInt(3) != Telephony.Sms.MESSAGE_TYPE_INBOX
                 val messageText = c.getString(2) ?: ""
                 val date = DateFormat.format("HH:mm", c.getLong(4)).toString()
                 val status = when (c.getInt(3)) {
-                    Telephony.Sms.MESSAGE_TYPE_SENT -> " • Terkirim"
+                    Telephony.Sms.MESSAGE_TYPE_SENT -> if (c.getInt(6) == Telephony.Sms.STATUS_COMPLETE) " • Sampai ke perangkat" else " • Terkirim"
                     Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal (kode ${c.getInt(5)})"
                     Telephony.Sms.MESSAGE_TYPE_OUTBOX -> " • Mengirim"
                     else -> ""
@@ -399,5 +416,6 @@ class ComposeActivity : Activity() {
             }
         }
         scrollToLatest()
+        markConversationRead(address)
     }
 }
