@@ -84,6 +84,7 @@ class ComposeActivity : Activity() {
                 val nav = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
                 val bottom = if (insets.isVisible(WindowInsets.Type.ime())) ime else nav
                 view.setPadding(dp(16),dp(12),dp(16),bottom + dp(12))
+                scrollToLatest()
                 insets
             }
         }
@@ -122,7 +123,8 @@ class ComposeActivity : Activity() {
                 }
             })
         }
-        val history=ScrollView(this)
+        val history=ScrollView(this).apply { isFillViewport = true; descendantFocusability = android.view.ViewGroup.FOCUS_BEFORE_DESCENDANTS }
+        historyScroll=history
         val messages=LinearLayout(this).apply { orientation=1 }
         history.addView(messages)
         messageList = messages
@@ -136,8 +138,12 @@ class ComposeActivity : Activity() {
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
         history.clipToPadding=false
+        history.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
+            if (bottom != oldBottom) scrollToLatest()
+        }
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis pesan..."; minLines=1; maxLines=4; textSize=16f; background=shape(Color.WHITE,Color.rgb(250,249,255),18); setPadding(dp(15),dp(12),dp(15),dp(12)) }
+        body.setOnFocusChangeListener { _, focused -> if (focused) scrollToLatest() }
         val composer = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(4),dp(12),dp(4),dp(12)); background=shape(Color.rgb(238,242,255),Color.rgb(243,235,255),24) }
         composer.addView(body,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(10) })
         composer.addView(Button(this).apply { text="➤  Kirim pesan"; isAllCaps=false; textSize=16f; setTextColor(Color.WHITE); background=shape(Color.rgb(52,105,226),Color.rgb(120,78,211),18); minHeight=dp(54); setOnClickListener {
@@ -255,5 +261,6 @@ class ComposeActivity : Activity() {
 
             }
         }
+        scrollToLatest()
     }
 }
