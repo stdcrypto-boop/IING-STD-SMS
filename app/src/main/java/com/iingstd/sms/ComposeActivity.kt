@@ -1,6 +1,11 @@
 package com.iingstd.sms
 
 import android.Manifest
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.ContentValues
+import android.net.Uri
+import java.util.UUID
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -31,12 +36,37 @@ class ComposeActivity : Activity() {
                 requestPermissions(arrayOf(Manifest.permission.SEND_SMS),3); return@setOnClickListener
             }
             try {
+                if (Telephony.Sms.getDefaultSmsPackage(this@ComposeActivity) != packageName) {
+                    Toast.makeText(this@ComposeActivity,"Jadikan IING STD SMS aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                val values = ContentValues().apply {
+                    put(Telephony.Sms.ADDRESS,to)
+                    put(Telephony.Sms.BODY,message)
+                    put(Telephony.Sms.DATE,System.currentTimeMillis())
+                    put(Telephony.Sms.READ,1)
+                    put(Telephony.Sms.TYPE,Telephony.Sms.MESSAGE_TYPE_OUTBOX)
+                }
+                val uri = contentResolver.insert(Telephony.Sms.Outbox.CONTENT_URI,values)
+                    ?: throw IllegalStateException("Tidak bisa menyimpan SMS")
                 val manager=SmsManager.getDefault()
                 val parts=manager.divideMessage(message)
-                if(parts.size>1) manager.sendMultipartTextMessage(to,null,parts,null,null)
-                else manager.sendTextMessage(to,null,message,null,null)
+                val token=UUID.randomUUID().toString()
+                val callbacks=ArrayList<PendingIntent>()
+                parts.forEachIndexed { index, _ ->
+                    val callback=Intent(this@ComposeActivity,SentReceiver::class.java).apply {
+                        action="com.iingstd.sms.SENT"
+                        data=Uri.parse("iingsms://sent/$token/$index")
+                        putExtra("message_uri",uri.toString())
+                        putExtra("token",token)
+                        putExtra("part_count",parts.size)
+                    }
+                    callbacks.add(PendingIntent.getBroadcast(this@ComposeActivity,0,callback,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                }
+                if(parts.size>1) manager.sendMultipartTextMessage(to,null,parts,callbacks,null)
+                else manager.sendTextMessage(to,null,message,callbacks.first(),null)
                 body.setText("")
-                Toast.makeText(this@ComposeActivity,"SMS diserahkan ke jaringan",Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ComposeActivity,"Mengirim SMS...",Toast.LENGTH_SHORT).show()
                 loadHistory(to,messages)
             } catch(e: Exception) { Toast.makeText(this@ComposeActivity,"Gagal: ${e.message}",Toast.LENGTH_LONG).show() }
         } })
