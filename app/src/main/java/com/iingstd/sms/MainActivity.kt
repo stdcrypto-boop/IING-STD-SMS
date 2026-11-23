@@ -36,6 +36,14 @@ class MainActivity : Activity() {
             setLayerInset(1, 0, 0, dp(2), dp(3))
         }
     }
+    private fun keyFor(address: String): String {
+        val digits = address.filter { it.isDigit() }
+        return when {
+            digits.startsWith("62") && digits.length >= 10 -> "0" + digits.drop(2)
+            digits.startsWith("0") && digits.length >= 9 -> digits
+            else -> address.trim().uppercase()
+        }
+    }
     private fun isDefaultSms(): Boolean {
         if (Build.VERSION.SDK_INT >= 29) {
             val role = getSystemService(RoleManager::class.java)
@@ -155,7 +163,7 @@ class MainActivity : Activity() {
                 arrayOf("address", "body", "date", "read", "type"), null, null, "date DESC")?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val address = cursor.getString(0) ?: "Tidak dikenal"
-                    if (!seen.add(address)) continue
+                    if (!seen.add(keyFor(address))) continue
                     val body = cursor.getString(1).orEmpty()
                     val date = cursor.getLong(2)
                     val unread = cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0
