@@ -366,9 +366,6 @@ class MainActivity : Activity() {
                             failed = result.second
                         } finally { trash.close() }
                     } catch (_: Exception) { failed++ }
-                            }
-                        } finally { trash.close() }
-                    } catch (_: Exception) { failed++ }
                     runOnUiThread {
                         deleting = false
                         selectedConversations.clear()
