@@ -49,6 +49,49 @@ class TrashStore(private val context: Context) : SQLiteOpenHelper(context, "sms_
         return false
     }
     /**
+     * Batch delete: one SQLite transaction instead of a disk commit per SMS.
+     * The backup is inserted before each provider delete; failures remove that backup.
+     * Commit successful backups even if a later SMS fails.
+     */
+    fun moveSmsToTrashBatch(ids: List<Long>, progress: (Int, Int) -> Unit = { _, _ -> }): Pair<Int, Int> {
+        val db = writableDatabase
+        var moved = 0
+        var failed = 0
+        db.beginTransaction()
+        try {
+            ids.forEachIndexed { index, smsId ->
+                try {
+                    val uri = Uri.withAppendedPath(Telephony.Sms.CONTENT_URI, smsId.toString())
+                    val record = context.contentResolver.query(uri,
+                        arrayOf("address", "body", "date", "type", "read", "seen"), null, null, null)?.use { c ->
+                        if (!c.moveToFirst()) null else Entry(0, c.getString(0).orEmpty(),
+                            c.getString(1).orEmpty(), c.getLong(2), c.getInt(3),
+                            c.getInt(4), c.getInt(5), System.currentTimeMillis())
+                    }
+                    if (record == null) {
+                        failed++
+                    } else {
+                        val values = ContentValues().apply {
+                            put("address", record.address); put("body", record.body)
+                            put("msg_date", record.date); put("msg_type", record.type)
+                            put("msg_read", record.read); put("msg_seen", record.seen)
+                            put("deleted_at", record.deletedAt)
+                        }
+                        val backupId = db.insertOrThrow("trash", null, values)
+                        if (context.contentResolver.delete(uri, null, null) > 0) moved++
+                        else {
+                            db.delete("trash", "id=?", arrayOf(backupId.toString()))
+                            failed++
+                        }
+                    }
+                } catch (_: Exception) { failed++ }
+                if ((index + 1) % 10 == 0 || index + 1 == ids.size) progress(index + 1, ids.size)
+            }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        return moved to failed
+    }
+    /**
      * Restore into the correct Android SMS box and verify the row is readable
      * before removing the recovery copy. A failed verification retains the backup.
      */
