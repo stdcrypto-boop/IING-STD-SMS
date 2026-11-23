@@ -33,8 +33,21 @@ jobs:
             echo "Build failed; waiting before retry..."
             sleep $((attempt * 45))
           done
+      - name: Verify APK signature, manifest and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_DIR"
+          BUILD_TOOLS="$(find "$SDK_DIR/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | head -n 8
+          sha256sum "$APK" | tee app-debug.sha256
+          echo "APK signature verified; SHA-256 checksum recorded."
       - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: IING-STD-SMS-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: |\n            app/build/outputs/apk/debug/*.apk\n            app-debug.sha256
