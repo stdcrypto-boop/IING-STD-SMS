@@ -7,6 +7,10 @@ import android.content.ContentValues
 import android.net.Uri
 import java.util.UUID
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.app.role.RoleManager
 import android.graphics.Typeface
 import android.content.pm.PackageManager
@@ -95,6 +99,11 @@ class ComposeActivity : Activity() {
         val header=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(15),dp(18),dp(15)); background=shape(Color.rgb(25,44,88),Color.rgb(47,83,158)) }
         header.addView(TextView(this).apply { text="‹  Percakapan"; textSize=23f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setOnClickListener { finish() } })
         header.addView(TextView(this).apply { text="IING STD SMS  •  Pesan pribadi"; textSize=12f; setTextColor(Color.rgb(190,213,255)) })
+        header.addView(TextView(this).apply {
+            text="⋮  Opsi percakapan"; textSize=14f; setTextColor(Color.WHITE)
+            setPadding(0,dp(12),0,0)
+            setOnClickListener { showConversationActions() }
+        })
         root.addView(header,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
         val number=EditText(this).apply { hint="Nomor tujuan"; setSingleLine(true); setText(intent.getStringExtra("address") ?: intent.data?.schemeSpecificPart ?: "") }
         number.background=shape(Color.WHITE,Color.rgb(249,249,255),16)
@@ -147,6 +156,7 @@ class ComposeActivity : Activity() {
         }
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis pesan..."; minLines=1; maxLines=4; textSize=16f; background=shape(Color.WHITE,Color.rgb(250,249,255),18); setPadding(dp(15),dp(12),dp(15),dp(12)) }
+        intent.getStringExtra("forward_body")?.let { body.setText(it); body.setSelection(body.length()) }
         body.setOnFocusChangeListener { _, focused -> if (focused) scrollToLatest() }
         val composer = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(dp(6),dp(8),dp(6),dp(8)); background=shape(Color.rgb(234,239,249),Color.rgb(234,239,249),24) }
         composer.addView(body,LinearLayout.LayoutParams(0,-2,1f).apply { rightMargin=dp(8) })
@@ -219,6 +229,61 @@ class ComposeActivity : Activity() {
         setContentView(root)
         loadHistory(number.text.toString(),messages)
     }
+    private fun showConversationActions() {
+        AlertDialog.Builder(this).setTitle("Opsi percakapan")
+            .setItems(arrayOf("Blokir nomor (pengaturan Android)", "Hapus seluruh percakapan")) { _, which ->
+                if (which == 0) openBlockedNumbers() else confirmDeleteConversation()
+            }.show()
+    }
+    private fun openBlockedNumbers() {
+        try { startActivity(Intent("android.settings.BLOCKED_NUMBERS_SETTINGS")) }
+        catch (_: Exception) {
+            Toast.makeText(this,"Pengaturan blokir nomor tidak tersedia di perangkat ini",Toast.LENGTH_LONG).show()
+        }
+    }
+    private fun confirmDeleteConversation() {
+        val target=currentAddress
+        if (target.isBlank()) return
+        AlertDialog.Builder(this).setTitle("Hapus seluruh percakapan?")
+            .setMessage("Semua SMS dari dan ke $target akan dihapus dari penyimpanan SMS Android. Tindakan ini tidak dapat dibatalkan.")
+            .setNegativeButton("Batal",null)
+            .setPositiveButton("Hapus") { _,_ ->
+                if (!isSmsDefault()) { Toast.makeText(this,"Jadikan aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show(); return@setPositiveButton }
+                try {
+                    val ids=mutableListOf<Long>()
+                    contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf(Telephony.Sms._ID,Telephony.Sms.ADDRESS),null,null,null)?.use { c ->
+                        while(c.moveToNext()) if(normalized(c.getString(1).orEmpty())==normalized(target)) ids.add(c.getLong(0))
+                    }
+                    var removed=0
+                    ids.forEach { id -> removed+=contentResolver.delete(Uri.withAppendedPath(Telephony.Sms.CONTENT_URI,id.toString()),null,null) }
+                    Toast.makeText(this,"$removed SMS dihapus",Toast.LENGTH_SHORT).show()
+                    messageList?.let { loadHistory(target,it) }
+                } catch(e:Exception) { Toast.makeText(this,"Gagal menghapus: ${e.message}",Toast.LENGTH_LONG).show() }
+            }.show()
+    }
+    private fun showMessageActions(id:Long,body:String) {
+        AlertDialog.Builder(this).setTitle("Tindakan pesan")
+            .setItems(arrayOf("Salin teks", "Teruskan pesan", "Hapus pesan")) { _,which ->
+                when(which) {
+                    0 -> {
+                        val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("SMS",body))
+                        Toast.makeText(this,"Teks disalin",Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> startActivity(Intent(this,ComposeActivity::class.java).putExtra("forward_body",body))
+                    2 -> AlertDialog.Builder(this).setTitle("Hapus pesan?")
+                        .setMessage("Pesan ini akan dihapus permanen dari penyimpanan SMS Android.")
+                        .setNegativeButton("Batal",null).setPositiveButton("Hapus") { _,_ ->
+                            if (!isSmsDefault()) { Toast.makeText(this,"Jadikan aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show(); return@setPositiveButton }
+                            try {
+                                val deleted=contentResolver.delete(Uri.withAppendedPath(Telephony.Sms.CONTENT_URI,id.toString()),null,null)
+                                Toast.makeText(this,if(deleted>0) "Pesan dihapus" else "Pesan tidak ditemukan",Toast.LENGTH_SHORT).show()
+                                messageList?.let { loadHistory(currentAddress,it) }
+                            } catch(e:Exception) { Toast.makeText(this,"Gagal menghapus: ${e.message}",Toast.LENGTH_LONG).show() }
+                        }.show()
+                }
+            }.show()
+    }
     private fun normalized(address:String):String {
         val digits=address.filter { it.isDigit() }
         return when {
@@ -230,15 +295,15 @@ class ComposeActivity : Activity() {
     private fun loadHistory(address:String,layout:LinearLayout) {
         layout.removeAllViews()
         if(address.isBlank() || checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
-        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("address","body","type","date","error_code"),null,null,"date ASC")?.use { c ->
+        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("_id","address","body","type","date","error_code"),null,null,"date ASC")?.use { c ->
             while(c.moveToNext()) {
-                if (normalized(c.getString(0).orEmpty()) != normalized(address)) continue
-                val outgoing = c.getInt(2) != Telephony.Sms.MESSAGE_TYPE_INBOX
-                val messageText = c.getString(1) ?: ""
-                val date = DateFormat.format("HH:mm", c.getLong(3)).toString()
-                val status = when (c.getInt(2)) {
+                if (normalized(c.getString(1).orEmpty()) != normalized(address)) continue
+                val outgoing = c.getInt(3) != Telephony.Sms.MESSAGE_TYPE_INBOX
+                val messageText = c.getString(2) ?: ""
+                val date = DateFormat.format("HH:mm", c.getLong(4)).toString()
+                val status = when (c.getInt(3)) {
                     Telephony.Sms.MESSAGE_TYPE_SENT -> " • Terkirim"
-                    Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal (kode ${c.getInt(4)})"
+                    Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal (kode ${c.getInt(5)})"
                     Telephony.Sms.MESSAGE_TYPE_OUTBOX -> " • Mengirim"
                     else -> ""
                 }
@@ -255,6 +320,8 @@ class ComposeActivity : Activity() {
                     linksClickable=true
                     movementMethod=android.text.method.LinkMovementMethod.getInstance()
                     background=bubble
+                    val smsId=c.getLong(0)
+                    setOnLongClickListener { showMessageActions(smsId,messageText); true }
                 }
                 val row=LinearLayout(this).apply {
                     gravity=if(outgoing) Gravity.END else Gravity.START
