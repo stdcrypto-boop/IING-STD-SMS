@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(radius).toFloat()
     }
+    private fun gradient(top: Int, bottom: Int, radius: Int = 0) = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(top, bottom)).apply { cornerRadius = dp(radius).toFloat() }
     private fun isDefaultSms(): Boolean =
         Telephony.Sms.getDefaultSmsPackage(this) == packageName
 
@@ -36,9 +37,13 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(12))
-            setBackgroundColor(Color.rgb(248, 250, 255))
+            background = gradient(Color.rgb(235, 242, 255), Color.rgb(251, 246, 255))
         }
-        val header = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(12))
+            background = gradient(Color.rgb(222, 234, 255), Color.rgb(242, 231, 255), 24)
+        }
         header.addView(TextView(this).apply {
             text = "Pesan"; textSize = 30f; setTextColor(Color.rgb(25, 35, 60))
             setTypeface(null, Typeface.BOLD)
@@ -47,7 +52,7 @@ class MainActivity : Activity() {
             text = "IING STD SMS"; textSize = 12f; setTextColor(blue)
             letterSpacing = .12f; setPadding(0, 0, 0, dp(12))
         })
-        root.addView(header)
+        root.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         defaultButton = Button(this).apply {
             text = "Aktifkan sebagai aplikasi SMS utama"
             isAllCaps = false
@@ -67,7 +72,7 @@ class MainActivity : Activity() {
             text = "＋  Baru"; textSize = 15f
             setTextColor(Color.WHITE); gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            background = rounded(blue, 22)
+            background = gradient(Color.rgb(53, 107, 228), Color.rgb(120, 80, 212), 22)
             setOnClickListener { startActivity(Intent(this@MainActivity, ComposeActivity::class.java)) }
         }, LinearLayout.LayoutParams(dp(100), dp(44)))
         root.addView(section)
@@ -154,7 +159,7 @@ class MainActivity : Activity() {
         val row = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(14), dp(12), dp(14))
-            background = rounded(if (unread) Color.rgb(228, 238, 255) else Color.WHITE, 18)
+            background = if (unread) gradient(Color.rgb(205, 225, 255), Color.rgb(233, 224, 255), 18) else gradient(Color.WHITE, Color.rgb(249, 248, 255), 18)
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
             }
