@@ -13,13 +13,17 @@ import android.os.Bundle
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.text.util.Linkify
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.view.View
+import android.text.format.DateFormat
 import android.widget.*
 
 class ComposeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply { orientation=1; setPadding(22,30,22,22); setBackgroundColor(Color.rgb(247,249,255)) }
-        val header=TextView(this).apply { text="Pesan"; textSize=26f; setTextColor(Color.rgb(52,91,222)) }
+        val header=TextView(this).apply { text="Percakapan"; textSize=26f; setTextColor(Color.rgb(52,91,222)); setPadding(0,0,0,18) }
         root.addView(header)
         val number=EditText(this).apply { hint="Nomor tujuan"; setSingleLine(true); setText(intent.getStringExtra("address") ?: intent.data?.schemeSpecificPart ?: "") }
         root.addView(number)
@@ -27,7 +31,7 @@ class ComposeActivity : Activity() {
         val messages=LinearLayout(this).apply { orientation=1 }
         history.addView(messages)
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
-        val body=EditText(this).apply { hint="Tulis SMS..."; minLines=2 }
+        val body=EditText(this).apply { hint="Tulis SMS..."; minLines=2; maxLines=5 }
         root.addView(body)
         root.addView(Button(this).apply { text="Kirim SMS"; setOnClickListener {
             val to=number.text.toString().trim(); val message=body.text.toString()
@@ -76,14 +80,32 @@ class ComposeActivity : Activity() {
     private fun loadHistory(address:String,layout:LinearLayout) {
         layout.removeAllViews()
         if(address.isBlank() || checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
-        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("body","type"),"address = ?",arrayOf(address),"date ASC")?.use { c ->
+        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("body","type","date"),"address = ?",arrayOf(address),"date ASC")?.use { c ->
             while(c.moveToNext()) {
-                val item=TextView(this).apply {
-                    text=c.getString(0) ?: ""; textSize=17f; setTextColor(Color.rgb(25,35,55))
-                    setPadding(18,14,18,14); autoLinkMask=Linkify.WEB_URLS or Linkify.EMAIL_ADDRESSES or Linkify.PHONE_NUMBERS
-                    setBackgroundColor(if(c.getInt(1)==2) Color.rgb(207,224,255) else Color.WHITE)
+                val outgoing = c.getInt(1) != Telephony.Sms.MESSAGE_TYPE_INBOX
+                val messageText = c.getString(0) ?: ""
+                val date = DateFormat.format("HH:mm", c.getLong(2)).toString()
+                val bubble = GradientDrawable().apply {
+                    setColor(if(outgoing) Color.rgb(211,226,255) else Color.WHITE)
+                    cornerRadius = 32f
                 }
-                layout.addView(item,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=10 })
+                val item=TextView(this).apply {
+                    text="$messageText\n$date"
+                    textSize=16f
+                    setTextColor(Color.rgb(25,35,55))
+                    setPadding(22,16,22,16)
+                    autoLinkMask=Linkify.WEB_URLS or Linkify.EMAIL_ADDRESSES or Linkify.PHONE_NUMBERS
+                    linksClickable=true
+                    movementMethod=android.text.method.LinkMovementMethod.getInstance()
+                    background=bubble
+                }
+                val row=LinearLayout(this).apply {
+                    gravity=if(outgoing) Gravity.END else Gravity.START
+                    setPadding(0,5,0,5)
+                }
+                row.addView(item,LinearLayout.LayoutParams(-2,-2).apply { width=LinearLayout.LayoutParams.WRAP_CONTENT })
+                layout.addView(row,LinearLayout.LayoutParams(-1,-2))
+
             }
         }
     }
