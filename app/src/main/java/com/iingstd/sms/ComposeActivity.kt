@@ -25,6 +25,9 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.text.util.Linkify
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -124,10 +127,27 @@ class ComposeActivity : Activity() {
         if (simChoices.isEmpty()) {
             simChoices.add("SIM default Android" to SubscriptionManager.getDefaultSmsSubscriptionId())
         }
-        simSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, simChoices.map { it.first })
+        simSpinner.adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, simChoices.map { it.first }) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                return (super.getView(position, convertView, parent) as TextView).apply {
+                    setTextColor(Color.rgb(9, 44, 35))
+                    setTypeface(null, Typeface.BOLD)
+                    textSize = 16f
+                    setPadding(dp(16), dp(9), dp(12), dp(9))
+                }
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                return (super.getDropDownView(position, convertView, parent) as TextView).apply {
+                    setTextColor(Color.rgb(9, 44, 35))
+                    setBackgroundColor(Color.rgb(188, 244, 207))
+                    textSize = 16f
+                    setPadding(dp(16), dp(12), dp(12), dp(12))
+                }
+            }
+        }
         val defaultSimIndex = simChoices.indexOfFirst { it.second == SubscriptionManager.getDefaultSmsSubscriptionId() }
         if (defaultSimIndex >= 0) simSpinner.setSelection(defaultSimIndex)
-        simSpinner.background=shape(Color.rgb(45,62,69),Color.rgb(45,62,69),14)
+        simSpinner.background=shape(Color.rgb(122,230,164),Color.rgb(80,203,145),14)
         root.addView(simSpinner,LinearLayout.LayoutParams(-1,dp(48)).apply { bottomMargin=dp(8) })
         if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             root.addView(Button(this).apply {
@@ -317,9 +337,15 @@ class ComposeActivity : Activity() {
                     cornerRadius = dp(20).toFloat()
                 }
                 val item=TextView(this).apply {
-                    text="$messageText\n$date$status"
+                    val messageColor = if (outgoing) Color.rgb(255, 224, 120) else Color.rgb(255, 245, 158)
+                    val metadataColor = if (outgoing) Color.rgb(183, 235, 207) else Color.rgb(157, 180, 187)
+                    val fullText = "$messageText\n$date$status"
+                    text = SpannableString(fullText).apply {
+                        setSpan(ForegroundColorSpan(messageColor), 0, messageText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        setSpan(ForegroundColorSpan(metadataColor), messageText.length, fullText.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
                     textSize=16f
-                    setTextColor(Color.WHITE)
+                    setTextColor(messageColor)
                     setPadding(dp(14),dp(11),dp(14),dp(11))
                     autoLinkMask=Linkify.WEB_URLS or Linkify.EMAIL_ADDRESSES or Linkify.PHONE_NUMBERS
                     linksClickable=true
