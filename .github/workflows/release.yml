@@ -33,7 +33,28 @@ jobs:
           SMS_STORE_PASSWORD: ${{ secrets.SMS_STORE_PASSWORD }}
           SMS_KEY_ALIAS: ${{ secrets.SMS_KEY_ALIAS }}
           SMS_KEY_PASSWORD: ${{ secrets.SMS_KEY_PASSWORD }}
-        run: gradle --no-daemon --console=plain assembleRelease
+        run: gradle --no-daemon --console=plain :app:assembleRelease :preview:assembleRelease
+      - name: Verify both release APK signatures and permission-free preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose preview/build/outputs/apk/release/preview-release.apk
+          "$BUILD_TOOLS/aapt" dump permissions preview/build/outputs/apk/release/preview-release.apk | tee preview-permissions.txt
+          if grep -E 'android.permission.(READ_SMS|RECEIVE_SMS|SEND_SMS|READ_PHONE_STATE|READ_CONTACTS)' preview-permissions.txt; then
+            echo "::error::Preview unexpectedly contains sensitive SMS or phone permissions"
+            exit 1
+          fi
+          sha256sum app/build/outputs/apk/release/app-release.apk preview/build/outputs/apk/release/preview-release.apk > release-checksums.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IING-STD-SMS-preview-safe
+          path: |
+            preview/build/outputs/apk/release/preview-release.apk
+            preview-permissions.txt
+            release-checksums.sha256
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: IING-STD-SMS-signed-release
