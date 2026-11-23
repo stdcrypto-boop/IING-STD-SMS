@@ -21,15 +21,21 @@ class SmsReceiver : BroadcastReceiver() {
         if (messages.isEmpty()) return
         val sender = messages.first().displayOriginatingAddress ?: return
         val body = messages.joinToString("") { it.displayMessageBody ?: "" }
+        val receivedAt = messages.first().timestampMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
+        val fingerprint = "$sender|$receivedAt|$body"
+        val prefs = context.getSharedPreferences("sms_incoming", Context.MODE_PRIVATE)
+        if (prefs.getString("last_fingerprint", null) == fingerprint) return
         val values = ContentValues().apply {
             put(Telephony.Sms.ADDRESS, sender)
             put(Telephony.Sms.BODY, body)
-            put(Telephony.Sms.DATE, System.currentTimeMillis())
+            put(Telephony.Sms.DATE, receivedAt)
             put(Telephony.Sms.READ, 0)
             put(Telephony.Sms.SEEN, 0)
         }
         try {
-            context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+            val saved = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+            if (saved == null) return
+            prefs.edit().putString("last_fingerprint", fingerprint).apply()
         } catch (_: Exception) {
             return
         }
