@@ -28,10 +28,10 @@ class MainActivity : Activity() {
     }
     private fun gradient(top: Int, bottom: Int, radius: Int = 0) = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(top, bottom)).apply { cornerRadius = dp(radius).toFloat() }
     private fun conversationSurface(unread: Boolean): LayerDrawable {
-        val shadow = rounded(Color.argb(24, 49, 73, 140), 24)
-        val fill = gradient(if (unread) Color.rgb(207, 227, 255) else Color.WHITE,
-            if (unread) Color.rgb(236, 226, 255) else Color.rgb(246, 248, 255), 22)
-        fill.setStroke(dp(if (unread) 2 else 1), if (unread) Color.rgb(119, 145, 235) else Color.rgb(225, 232, 248))
+        val shadow = rounded(Color.argb(13, 49, 73, 140), 20)
+        val fill = gradient(if (unread) Color.rgb(234, 242, 255) else Color.WHITE,
+            if (unread) Color.rgb(242, 247, 255) else Color.WHITE, 18)
+        fill.setStroke(dp(1), if (unread) Color.rgb(173, 199, 245) else Color.rgb(233, 238, 246))
         return LayerDrawable(arrayOf(shadow, fill)).apply {
             setLayerInset(1, 0, 0, dp(2), dp(3))
         }
@@ -60,23 +60,23 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(12))
-            background = gradient(Color.rgb(235, 242, 255), Color.rgb(251, 246, 255))
+            setBackgroundColor(Color.rgb(247, 249, 253))
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(12))
-            background = gradient(Color.rgb(222, 234, 255), Color.rgb(242, 231, 255), 24)
+            setPadding(dp(20), dp(20), dp(20), dp(16))
+            background = gradient(Color.rgb(25, 44, 88), Color.rgb(47, 83, 158), 24)
         }
         header.addView(TextView(this).apply {
-            text = "Pesan"; textSize = 30f; setTextColor(Color.rgb(25, 35, 60))
+            text = "Pesan"; textSize = 30f; setTextColor(Color.WHITE)
             setTypeface(null, Typeface.BOLD)
         })
         header.addView(TextView(this).apply {
-            text = "IING STD SMS"; textSize = 12f; setTextColor(blue)
+            text = "IING STD  •  MESSENGER"; textSize = 12f; setTextColor(Color.rgb(190, 213, 255))
             letterSpacing = .12f; setPadding(0, 0, 0, dp(12))
         })
         header.addView(TextView(this).apply {
-            text="⚙  Pengaturan & Diagnostik"; textSize=14f; setTextColor(blue)
+            text="⚙  Pengaturan & Diagnostik"; textSize=13f; setTextColor(Color.WHITE)
             setPadding(0,dp(5),0,dp(8))
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         })
@@ -100,7 +100,7 @@ class MainActivity : Activity() {
             text = "＋  Baru"; textSize = 15f
             setTextColor(Color.WHITE); gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            background = gradient(Color.rgb(53, 107, 228), Color.rgb(120, 80, 212), 22)
+            background = gradient(Color.rgb(38, 91, 208), Color.rgb(32, 66, 156), 18)
             setOnClickListener { startActivity(Intent(this@MainActivity, ComposeActivity::class.java)) }
         }, LinearLayout.LayoutParams(dp(100), dp(44)))
         root.addView(section)
@@ -186,9 +186,9 @@ class MainActivity : Activity() {
     private fun addConversation(address: String, body: String, date: Long, unread: Boolean) {
         val row = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(16), dp(14), dp(17))
+            setPadding(dp(14), dp(13), dp(14), dp(13))
             background = conversationSurface(unread)
-            elevation = dp(2).toFloat()
+            elevation = dp(1).toFloat()
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
             }
@@ -220,6 +220,6 @@ class MainActivity : Activity() {
             text = DateUtils.getRelativeTimeSpanString(date, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
             textSize = 11f; setTextColor(Color.GRAY); maxLines = 1
         })
-        list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
     }
 }
