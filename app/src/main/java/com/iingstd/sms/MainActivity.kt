@@ -2,6 +2,7 @@ package com.iingstd.sms
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -21,6 +22,12 @@ import android.widget.*
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout
     private lateinit var defaultButton: Button
+    private lateinit var selectionBar: LinearLayout
+    private lateinit var selectionLabel: TextView
+    private val selectedConversations = mutableSetOf<String>()
+    private val visibleConversations = mutableSetOf<String>()
+    private var selectionMode = false
+    private var deleting = false
     private val blue = Color.rgb(37, 211, 102)
     private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
@@ -109,6 +116,40 @@ class MainActivity : Activity() {
             setOnClickListener { startActivity(Intent(this@MainActivity, ComposeActivity::class.java)) }
         }, LinearLayout.LayoutParams(dp(100), dp(44)))
         root.addView(section)
+        selectionBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(6), dp(8), dp(8))
+            background = rounded(Color.rgb(31, 44, 52), 14)
+            visibility = View.GONE
+        }
+        selectionLabel = TextView(this).apply {
+            setTextColor(Color.WHITE); textSize = 14f
+        }
+        selectionBar.addView(selectionLabel, LinearLayout.LayoutParams(0, -2, 1f))
+        selectionBar.addView(TextView(this).apply {
+            text = "Semua"; textSize = 14f; setTextColor(Color.rgb(122, 230, 164))
+            setPadding(dp(8), dp(12), dp(8), dp(12))
+            setOnClickListener {
+                selectedConversations.clear()
+                selectedConversations.addAll(visibleConversations)
+                refresh()
+            }
+        })
+        selectionBar.addView(TextView(this).apply {
+            text = "Hapus"; textSize = 14f; setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(255, 210, 120))
+            setPadding(dp(8), dp(12), dp(8), dp(12))
+            setOnClickListener { confirmDeleteSelected() }
+        })
+        selectionBar.addView(TextView(this).apply {
+            text = "Batal"; textSize = 14f; setTextColor(Color.WHITE)
+            setPadding(dp(8), dp(12), dp(8), dp(12))
+            setOnClickListener {
+                selectionMode = false; selectedConversations.clear(); refresh()
+            }
+        })
+        root.addView(selectionBar)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(list)
@@ -160,6 +201,7 @@ class MainActivity : Activity() {
     }
     private fun refresh() {
         list.removeAllViews()
+        visibleConversations.clear()
         if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             list.addView(TextView(this).apply {
                 text = "Izin membaca SMS belum tersedia."
@@ -174,6 +216,7 @@ class MainActivity : Activity() {
                 while (cursor.moveToNext()) {
                     val address = cursor.getString(0) ?: "Tidak dikenal"
                     if (!seen.add(keyFor(address))) continue
+                    visibleConversations.add(keyFor(address))
                     val body = cursor.getString(1).orEmpty()
                     val date = cursor.getLong(2)
                     val unread = cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0
@@ -187,15 +230,80 @@ class MainActivity : Activity() {
         } catch (_: SecurityException) {
             Toast.makeText(this, "Izin SMS diperlukan", Toast.LENGTH_SHORT).show()
         }
+        selectedConversations.retainAll(visibleConversations)
+        updateSelectionBar()
+    }
+    private fun updateSelectionBar() {
+        if (!::selectionBar.isInitialized) return
+        selectionBar.visibility = if (selectionMode) View.VISIBLE else View.GONE
+        selectionLabel.text = "${selectedConversations.size} dipilih"
+    }
+    private fun toggleConversation(address: String) {
+        val key = keyFor(address)
+        selectionMode = true
+        if (!selectedConversations.add(key)) selectedConversations.remove(key)
+        refresh()
+    }
+    private fun confirmDeleteSelected() {
+        if (deleting || selectedConversations.isEmpty()) {
+            Toast.makeText(this, "Pilih percakapan terlebih dahulu", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!isDefaultSms()) {
+            Toast.makeText(this, "Jadikan IING STD SMS sebagai aplikasi SMS utama dahulu", Toast.LENGTH_LONG).show()
+            requestDefault()
+            return
+        }
+        val keys = selectedConversations.toSet()
+        AlertDialog.Builder(this)
+            .setTitle("Hapus ${keys.size} percakapan?")
+            .setMessage("Semua SMS di percakapan terpilih akan dipindahkan ke Tempat Sampah. Pesan dapat dipulihkan selama belum dihapus permanen atau melewati masa simpan 30 hari.")
+            .setNegativeButton("Batal", null)
+            .setPositiveButton("Pindahkan ke Sampah") { _, _ ->
+                deleting = true
+                Toast.makeText(this, "Memindahkan SMS ke Tempat Sampah...", Toast.LENGTH_SHORT).show()
+                Thread {
+                    var success = 0
+                    var failed = 0
+                    try {
+                        val ids = mutableListOf<Long>()
+                        contentResolver.query(Telephony.Sms.CONTENT_URI, arrayOf("_id", "address"), null, null, null)?.use { c ->
+                            while (c.moveToNext()) {
+                                if (keys.contains(keyFor(c.getString(1).orEmpty()))) ids.add(c.getLong(0))
+                            }
+                        }
+                        val trash = TrashStore(this@MainActivity)
+                        try {
+                            for (id in ids) {
+                                try {
+                                    if (trash.moveSmsToTrash(id)) success++ else failed++
+                                } catch (_: Exception) { failed++ }
+                            }
+                        } finally { trash.close() }
+                    } catch (_: Exception) { failed++ }
+                    runOnUiThread {
+                        deleting = false
+                        selectedConversations.clear()
+                        selectionMode = false
+                        refresh()
+                        Toast.makeText(this@MainActivity,
+                            "$success SMS dipindahkan ke Sampah" + if (failed > 0) ", $failed gagal" else "",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }.start()
+            }.show()
     }
     private fun addConversation(address: String, body: String, date: Long, unread: Boolean) {
         val row = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(13), dp(14), dp(13))
-            background = conversationSurface(unread)
+            background = if (selectedConversations.contains(keyFor(address)))
+                rounded(Color.rgb(39, 104, 88), 12) else conversationSurface(unread)
             elevation = 0f
+            setOnLongClickListener { toggleConversation(address); true }
             setOnClickListener {
-                startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
+                if (selectionMode) toggleConversation(address)
+                else startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
             }
         }
         row.addView(TextView(this).apply {
