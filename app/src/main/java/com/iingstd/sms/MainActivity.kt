@@ -36,8 +36,13 @@ class MainActivity : Activity() {
             setLayerInset(1, 0, 0, dp(2), dp(3))
         }
     }
-    private fun isDefaultSms(): Boolean =
-        Telephony.Sms.getDefaultSmsPackage(this) == packageName
+    private fun isDefaultSms(): Boolean {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val role = getSystemService(RoleManager::class.java)
+            if (role.isRoleAvailable(RoleManager.ROLE_SMS) && role.isRoleHeld(RoleManager.ROLE_SMS)) return true
+        }
+        return Telephony.Sms.getDefaultSmsPackage(this) == packageName
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
