@@ -17,6 +17,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.provider.Telephony
+import android.telephony.PhoneNumberUtils
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.telephony.SubscriptionInfo
@@ -317,12 +318,20 @@ class ComposeActivity : Activity() {
             else -> address.trim().uppercase()
         }
     }
+    private fun sameSmsAddress(a: String, b: String): Boolean {
+        if (normalized(a) == normalized(b)) return true
+        val ad = a.filter { it.isDigit() }
+        val bd = b.filter { it.isDigit() }
+        if (ad.length < 9 || bd.length < 9) return false
+        // Android's telephony number matcher handles local/international dialing formats.
+        return PhoneNumberUtils.compare(a, b)
+    }
     private fun loadHistory(address:String,layout:LinearLayout) {
         layout.removeAllViews()
         if(address.isBlank() || checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
         contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("_id","address","body","type","date","error_code"),null,null,"date ASC")?.use { c ->
             while(c.moveToNext()) {
-                if (normalized(c.getString(1).orEmpty()) != normalized(address)) continue
+                if (!sameSmsAddress(c.getString(1).orEmpty(), address)) continue
                 val outgoing = c.getInt(3) != Telephony.Sms.MESSAGE_TYPE_INBOX
                 val messageText = c.getString(2) ?: ""
                 val date = DateFormat.format("HH:mm", c.getLong(4)).toString()
