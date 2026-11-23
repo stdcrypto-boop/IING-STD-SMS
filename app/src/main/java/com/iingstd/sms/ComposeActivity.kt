@@ -245,9 +245,9 @@ class ComposeActivity : Activity() {
         val target=currentAddress
         if (target.isBlank()) return
         AlertDialog.Builder(this).setTitle("Hapus seluruh percakapan?")
-            .setMessage("Semua SMS dari dan ke $target akan dihapus dari penyimpanan SMS Android. Tindakan ini tidak dapat dibatalkan.")
+            .setMessage("Semua SMS dari dan ke $target akan dipindahkan ke Tempat Sampah selama 30 hari.")
             .setNegativeButton("Batal",null)
-            .setPositiveButton("Hapus") { _,_ ->
+            .setPositiveButton("Pindahkan ke Sampah") { _,_ ->
                 if (!isSmsDefault()) { Toast.makeText(this,"Jadikan aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show(); return@setPositiveButton }
                 try {
                     val ids=mutableListOf<Long>()
@@ -255,8 +255,10 @@ class ComposeActivity : Activity() {
                         while(c.moveToNext()) if(normalized(c.getString(1).orEmpty())==normalized(target)) ids.add(c.getLong(0))
                     }
                     var removed=0
-                    ids.forEach { id -> removed+=contentResolver.delete(Uri.withAppendedPath(Telephony.Sms.CONTENT_URI,id.toString()),null,null) }
-                    Toast.makeText(this,"$removed SMS dihapus",Toast.LENGTH_SHORT).show()
+                    val trash=TrashStore(this)
+                    trash.purgeExpired()
+                    ids.forEach { id -> if(trash.moveSmsToTrash(id)) removed++ }
+                    Toast.makeText(this,"$removed SMS dipindahkan ke Tempat Sampah",Toast.LENGTH_SHORT).show()
                     messageList?.let { loadHistory(target,it) }
                 } catch(e:Exception) { Toast.makeText(this,"Gagal menghapus: ${e.message}",Toast.LENGTH_LONG).show() }
             }.show()
@@ -272,12 +274,14 @@ class ComposeActivity : Activity() {
                     }
                     1 -> startActivity(Intent(this,ComposeActivity::class.java).putExtra("forward_body",body))
                     2 -> AlertDialog.Builder(this).setTitle("Hapus pesan?")
-                        .setMessage("Pesan ini akan dihapus permanen dari penyimpanan SMS Android.")
-                        .setNegativeButton("Batal",null).setPositiveButton("Hapus") { _,_ ->
+                        .setMessage("Pesan ini akan dipindahkan ke Tempat Sampah dan dapat dipulihkan selama 30 hari.")
+                        .setNegativeButton("Batal",null).setPositiveButton("Pindahkan") { _,_ ->
                             if (!isSmsDefault()) { Toast.makeText(this,"Jadikan aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show(); return@setPositiveButton }
                             try {
-                                val deleted=contentResolver.delete(Uri.withAppendedPath(Telephony.Sms.CONTENT_URI,id.toString()),null,null)
-                                Toast.makeText(this,if(deleted>0) "Pesan dihapus" else "Pesan tidak ditemukan",Toast.LENGTH_SHORT).show()
+                                val trash=TrashStore(this)
+                                trash.purgeExpired()
+                                val deleted=if(trash.moveSmsToTrash(id)) 1 else 0
+                                Toast.makeText(this,if(deleted>0) "Pesan dipindahkan ke Sampah" else "Gagal memindahkan pesan",Toast.LENGTH_SHORT).show()
                                 messageList?.let { loadHistory(currentAddress,it) }
                             } catch(e:Exception) { Toast.makeText(this,"Gagal menghapus: ${e.message}",Toast.LENGTH_LONG).show() }
                         }.show()
