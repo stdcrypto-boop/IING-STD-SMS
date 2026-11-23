@@ -356,10 +356,16 @@ class MainActivity : Activity() {
                         }
                         val trash = TrashStore(this@MainActivity)
                         try {
-                            for (id in ids) {
-                                try {
-                                    if (trash.moveSmsToTrash(id)) success++ else failed++
-                                } catch (_: Exception) { failed++ }
+                            val result = trash.moveSmsToTrashBatch(ids) { done, total ->
+                                runOnUiThread {
+                                    if (!isFinishing && !isDestroyed)
+                                        selectionLabel.text = "Menghapus $done / $total SMS…"
+                                }
+                            }
+                            success = result.first
+                            failed = result.second
+                        } finally { trash.close() }
+                    } catch (_: Exception) { failed++ }
                             }
                         } finally { trash.close() }
                     } catch (_: Exception) { failed++ }
