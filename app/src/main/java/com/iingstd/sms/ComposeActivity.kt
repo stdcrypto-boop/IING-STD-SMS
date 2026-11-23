@@ -51,6 +51,10 @@ class ComposeActivity : Activity() {
     }
     private var currentAddress = ""
     private var messageList: LinearLayout? = null
+    private var historyScroll: ScrollView? = null
+    private fun scrollToLatest() {
+        historyScroll?.post { historyScroll?.fullScroll(View.FOCUS_DOWN) }
+    }
     private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             super.onChange(selfChange)
