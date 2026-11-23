@@ -92,9 +92,9 @@ class ComposeActivity : Activity() {
                 insets
             }
         }
-        val header=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(15),dp(18),dp(15)); background=shape(Color.rgb(209,226,255),Color.rgb(235,223,255)) }
-        header.addView(TextView(this).apply { text="‹  Percakapan"; textSize=23f; setTypeface(null,Typeface.BOLD); setTextColor(Color.rgb(35,54,108)); setOnClickListener { finish() } })
-        header.addView(TextView(this).apply { text="IING STD SMS  •  Pesan pribadi"; textSize=12f; setTextColor(Color.rgb(80,99,155)) })
+        val header=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(15),dp(18),dp(15)); background=shape(Color.rgb(25,44,88),Color.rgb(47,83,158)) }
+        header.addView(TextView(this).apply { text="‹  Percakapan"; textSize=23f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setOnClickListener { finish() } })
+        header.addView(TextView(this).apply { text="IING STD SMS  •  Pesan pribadi"; textSize=12f; setTextColor(Color.rgb(190,213,255)) })
         root.addView(header,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
         val number=EditText(this).apply { hint="Nomor tujuan"; setSingleLine(true); setText(intent.getStringExtra("address") ?: intent.data?.schemeSpecificPart ?: "") }
         number.background=shape(Color.WHITE,Color.rgb(249,249,255),16)
@@ -148,9 +148,9 @@ class ComposeActivity : Activity() {
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis pesan..."; minLines=1; maxLines=4; textSize=16f; background=shape(Color.WHITE,Color.rgb(250,249,255),18); setPadding(dp(15),dp(12),dp(15),dp(12)) }
         body.setOnFocusChangeListener { _, focused -> if (focused) scrollToLatest() }
-        val composer = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(4),dp(12),dp(4),dp(12)); background=shape(Color.rgb(238,242,255),Color.rgb(243,235,255),24) }
-        composer.addView(body,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(10) })
-        composer.addView(Button(this).apply { text="➤  Kirim pesan"; isAllCaps=false; textSize=16f; setTextColor(Color.WHITE); background=shape(Color.rgb(52,105,226),Color.rgb(120,78,211),18); minHeight=dp(54); setOnClickListener {
+        val composer = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(dp(6),dp(8),dp(6),dp(8)); background=shape(Color.rgb(234,239,249),Color.rgb(234,239,249),24) }
+        composer.addView(body,LinearLayout.LayoutParams(0,-2,1f).apply { rightMargin=dp(8) })
+        composer.addView(Button(this).apply { text="➤"; contentDescription="Kirim pesan"; isAllCaps=false; textSize=22f; setTextColor(Color.WHITE); background=shape(Color.rgb(38,91,208),Color.rgb(32,66,156),26); minHeight=dp(52); minWidth=dp(52); setOnClickListener {
             val to=number.text.toString().trim(); val message=body.text.toString()
             if(to.isEmpty() || message.isBlank()) { Toast.makeText(this@ComposeActivity,"Isi nomor dan pesan",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED) {
@@ -214,7 +214,7 @@ class ComposeActivity : Activity() {
                 Toast.makeText(this@ComposeActivity,"Gagal: ${e.message}",Toast.LENGTH_LONG).show()
                 loadHistory(to,messages)
             }
-        } },LinearLayout.LayoutParams(-1,dp(54)))
+        } },LinearLayout.LayoutParams(dp(56),dp(52)))
         root.addView(composer,LinearLayout.LayoutParams(-1,-2))
         setContentView(root)
         loadHistory(number.text.toString(),messages)
@@ -243,8 +243,8 @@ class ComposeActivity : Activity() {
                     else -> ""
                 }
                 val bubble = GradientDrawable().apply {
-                    setColor(if(outgoing) Color.rgb(211,226,255) else Color.WHITE)
-                    cornerRadius = dp(18).toFloat()
+                    setColor(if(outgoing) Color.rgb(218,233,255) else Color.WHITE)
+                    cornerRadius = dp(20).toFloat()
                 }
                 val item=TextView(this).apply {
                     text="$messageText\n$date$status"
