@@ -245,6 +245,7 @@ class ComposeActivity : Activity() {
                 val parts=manager.divideMessage(message)
                 val token=UUID.randomUUID().toString()
                 val callbacks=ArrayList<PendingIntent>()
+                val deliveryCallbacks=ArrayList<PendingIntent>()
                 parts.forEachIndexed { index, _ ->
                     val callback=Intent(this@ComposeActivity,SentReceiver::class.java).apply {
                         action="com.iingstd.sms.SENT"
@@ -254,9 +255,15 @@ class ComposeActivity : Activity() {
                         putExtra("part_count",parts.size)
                     }
                     callbacks.add(PendingIntent.getBroadcast(this@ComposeActivity,0,callback,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
+                    val deliveryIntent = Intent(this@ComposeActivity, DeliveryReceiver::class.java).apply {
+                        action = "com.iingstd.sms.DELIVERED"
+                        data = Uri.parse("iingsms://delivered/$token/$index")
+                        putExtra("message_uri", uri.toString())
+                    }
+                    deliveryCallbacks.add(PendingIntent.getBroadcast(this@ComposeActivity,0,deliveryIntent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE))
                 }
-                if(parts.size>1) manager.sendMultipartTextMessage(to,null,parts,callbacks,null)
-                else manager.sendTextMessage(to,null,message,callbacks.first(),null)
+                if(parts.size>1) manager.sendMultipartTextMessage(to,null,parts,callbacks,deliveryCallbacks)
+                else manager.sendTextMessage(to,null,message,callbacks.first(),deliveryCallbacks.first())
                 body.setText("")
                 Toast.makeText(this@ComposeActivity,"Mengirim SMS...",Toast.LENGTH_SHORT).show()
                 currentAddress = to
