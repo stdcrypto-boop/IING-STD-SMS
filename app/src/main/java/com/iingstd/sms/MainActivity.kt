@@ -15,12 +15,14 @@ import android.os.Bundle
 import android.provider.Telephony
 import android.text.TextUtils
 import android.text.format.DateUtils
+import android.view.MotionEvent
 import android.view.Gravity
 import android.view.View
 import android.widget.*
 
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout
+    private var refreshHint: TextView? = null
     private lateinit var defaultButton: Button
     private lateinit var selectionBar: LinearLayout
     private lateinit var selectionLabel: TextView
@@ -152,7 +154,53 @@ class MainActivity : Activity() {
             }
         })
         root.addView(selectionBar)
-        val scroll = ScrollView(this).apply { isFillViewport = true }
+        val hint = TextView(this).apply {
+            text = "↓ Tarik ke bawah untuk refresh"
+            textSize = 12f
+            setTextColor(Color.rgb(145, 175, 179))
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        refreshHint = hint
+        root.addView(hint)
+        var pullStartY = 0f
+        var pulling = false
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        pullStartY = event.y
+                        pulling = scrollY == 0
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (pulling && scrollY == 0) {
+                            val distance = event.y - pullStartY
+                            hint.visibility = if (distance > dp(32)) View.VISIBLE else View.GONE
+                            hint.text = if (distance > dp(90)) "↑ Lepaskan untuk refresh" else "↓ Tarik untuk refresh"
+                        } else {
+                            hint.visibility = View.GONE
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (pulling && scrollY == 0 && event.y - pullStartY > dp(90)) {
+                            hint.text = "⟳ Memuat percakapan…"
+                            hint.visibility = View.VISIBLE
+                            refresh()
+                        } else {
+                            hint.visibility = View.GONE
+                        }
+                        pulling = false
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        pulling = false
+                        hint.visibility = View.GONE
+                    }
+                }
+                false
+            }
+        }
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(list)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -234,6 +282,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (isFinishing || isDestroyed || generation != refreshGeneration) return@runOnUiThread
                 if (error) {
+                    refreshHint?.visibility = View.GONE
                     Toast.makeText(this@MainActivity, "Gagal memuat SMS", Toast.LENGTH_SHORT).show()
                     return@runOnUiThread
                 }
@@ -249,6 +298,7 @@ class MainActivity : Activity() {
                 })
                 selectedConversations.retainAll(visibleConversations)
                 updateSelectionBar()
+                refreshHint?.visibility = View.GONE
             }
         }.start()
     }
