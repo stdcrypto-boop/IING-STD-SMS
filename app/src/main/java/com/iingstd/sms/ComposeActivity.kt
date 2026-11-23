@@ -15,6 +15,9 @@ import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.telephony.SubscriptionInfo
 import android.os.Build
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.text.util.Linkify
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -23,6 +26,24 @@ import android.text.format.DateFormat
 import android.widget.*
 
 class ComposeActivity : Activity() {
+    private var currentAddress = ""
+    private var messageList: LinearLayout? = null
+    private val smsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            super.onChange(selfChange)
+            messageList?.let { if (currentAddress.isNotBlank()) loadHistory(currentAddress, it) }
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, smsObserver)
+        messageList?.let { if (currentAddress.isNotBlank()) loadHistory(currentAddress, it) }
+    }
+    override fun onPause() {
+        contentResolver.unregisterContentObserver(smsObserver)
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply { orientation=1; setPadding(22,30,22,22); setBackgroundColor(Color.rgb(247,249,255)) }
@@ -48,6 +69,8 @@ class ComposeActivity : Activity() {
         val history=ScrollView(this)
         val messages=LinearLayout(this).apply { orientation=1 }
         history.addView(messages)
+        messageList = messages
+        currentAddress = number.text.toString().trim()
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis SMS..."; minLines=2; maxLines=5 }
         root.addView(body)
@@ -99,6 +122,7 @@ class ComposeActivity : Activity() {
                 else manager.sendTextMessage(to,null,message,callbacks.first(),null)
                 body.setText("")
                 Toast.makeText(this@ComposeActivity,"Mengirim SMS...",Toast.LENGTH_SHORT).show()
+                currentAddress = to
                 loadHistory(to,messages)
             } catch(e: Exception) { Toast.makeText(this@ComposeActivity,"Gagal: ${e.message}",Toast.LENGTH_LONG).show() }
         } })
