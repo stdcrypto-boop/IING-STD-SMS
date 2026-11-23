@@ -62,6 +62,11 @@ class ComposeActivity : Activity() {
                     Toast.makeText(this@ComposeActivity,"Jadikan IING STD SMS aplikasi SMS utama terlebih dahulu",Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
+                val selectedId = simChoices[simSpinner.selectedItemPosition].second
+                if (selectedId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    Toast.makeText(this@ComposeActivity,"Pilih SIM SMS default di pengaturan HP",Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
                 val values = ContentValues().apply {
                     put(Telephony.Sms.ADDRESS,to)
                     put(Telephony.Sms.BODY,message)
@@ -71,11 +76,6 @@ class ComposeActivity : Activity() {
                 }
                 val uri = contentResolver.insert(Telephony.Sms.Outbox.CONTENT_URI,values)
                     ?: throw IllegalStateException("Tidak bisa menyimpan SMS")
-                val selectedId = simChoices[simSpinner.selectedItemPosition].second
-                if (selectedId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                    Toast.makeText(this@ComposeActivity,"Pilih SIM SMS default di pengaturan HP",Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
                 val manager = if (Build.VERSION.SDK_INT >= 31) {
                     getSystemService(SmsManager::class.java).createForSubscriptionId(selectedId)
                 } else {
