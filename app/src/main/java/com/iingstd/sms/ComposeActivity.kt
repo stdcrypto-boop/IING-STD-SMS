@@ -25,6 +25,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.text.format.DateFormat
 import android.widget.*
 
@@ -72,11 +73,12 @@ class ComposeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         window.statusBarColor = Color.rgb(231,239,255)
         window.navigationBarColor = Color.rgb(248,247,255)
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        val root = LinearLayout(this).apply { orientation=1; setPadding(dp(16),dp(12),dp(16),dp(10)); background=shape(Color.rgb(234,242,255),Color.rgb(250,245,255),0) }
+        val root = LinearLayout(this).apply { orientation=1; setPadding(dp(16),dp(12),dp(16),dp(12)); background=shape(Color.rgb(234,242,255),Color.rgb(250,245,255),0) }
         val header=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(15),dp(18),dp(15)); background=shape(Color.rgb(209,226,255),Color.rgb(235,223,255)) }
         header.addView(TextView(this).apply { text="‹  Percakapan"; textSize=23f; setTypeface(null,Typeface.BOLD); setTextColor(Color.rgb(35,54,108)); setOnClickListener { finish() } })
         header.addView(TextView(this).apply { text="IING STD SMS  •  Pesan pribadi"; textSize=12f; setTextColor(Color.rgb(80,99,155)) })
@@ -128,8 +130,9 @@ class ComposeActivity : Activity() {
         history.clipToPadding=false
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis pesan..."; minLines=1; maxLines=4; textSize=16f; background=shape(Color.WHITE,Color.rgb(250,249,255),18); setPadding(dp(15),dp(12),dp(15),dp(12)) }
-        root.addView(body,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8); bottomMargin=dp(8) })
-        root.addView(Button(this).apply { text="➤  Kirim pesan"; isAllCaps=false; textSize=16f; setTextColor(Color.WHITE); background=shape(Color.rgb(52,105,226),Color.rgb(120,78,211),18); minHeight=dp(54); setOnClickListener {
+        val composer = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(4),dp(12),dp(4),dp(12)); background=shape(Color.rgb(238,242,255),Color.rgb(243,235,255),24) }
+        composer.addView(body,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(10) })
+        composer.addView(Button(this).apply { text="➤  Kirim pesan"; isAllCaps=false; textSize=16f; setTextColor(Color.WHITE); background=shape(Color.rgb(52,105,226),Color.rgb(120,78,211),18); minHeight=dp(54); setOnClickListener {
             val to=number.text.toString().trim(); val message=body.text.toString()
             if(to.isEmpty() || message.isBlank()) { Toast.makeText(this@ComposeActivity,"Isi nomor dan pesan",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED) {
@@ -194,6 +197,7 @@ class ComposeActivity : Activity() {
                 loadHistory(to,messages)
             }
         } },LinearLayout.LayoutParams(-1,dp(54)))
+        root.addView(composer,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(64) })
         setContentView(root)
         loadHistory(number.text.toString(),messages)
     }
