@@ -22,6 +22,7 @@ import android.text.util.Linkify
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.text.format.DateFormat
 import android.widget.*
 
@@ -50,7 +51,16 @@ class ComposeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         val root = LinearLayout(this).apply { orientation=1; setPadding(22,30,22,22); setBackgroundColor(Color.rgb(247,249,255)) }
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.navigationBars())
+                val keyboard = insets.getInsets(WindowInsets.Type.ime())
+                view.setPadding(22,30,22,22 + maxOf(bars.bottom, keyboard.bottom))
+                insets
+            }
+        }
         val header=TextView(this).apply { text="Percakapan"; textSize=26f; setTextColor(Color.rgb(52,91,222)); setPadding(0,0,0,18) }
         root.addView(header)
         val number=EditText(this).apply { hint="Nomor tujuan"; setSingleLine(true); setText(intent.getStringExtra("address") ?: intent.data?.schemeSpecificPart ?: "") }
@@ -96,7 +106,7 @@ class ComposeActivity : Activity() {
         root.addView(history,LinearLayout.LayoutParams(-1,0,1f))
         val body=EditText(this).apply { hint="Tulis SMS..."; minLines=2; maxLines=5 }
         root.addView(body)
-        root.addView(Button(this).apply { text="Kirim SMS"; setOnClickListener {
+        root.addView(Button(this).apply { text="Kirim SMS"; minHeight = (56 * resources.displayMetrics.density).toInt(); setOnClickListener {
             val to=number.text.toString().trim(); val message=body.text.toString()
             if(to.isEmpty() || message.isBlank()) { Toast.makeText(this@ComposeActivity,"Isi nomor dan pesan",Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!=PackageManager.PERMISSION_GRANTED) {
