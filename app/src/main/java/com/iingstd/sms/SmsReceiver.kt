@@ -24,7 +24,10 @@ class SmsReceiver : BroadcastReceiver() {
         val receivedAt = messages.first().timestampMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
         val fingerprint = "$sender|$receivedAt|$body"
         val prefs = context.getSharedPreferences("sms_incoming", Context.MODE_PRIVATE)
-        if (prefs.getString("last_fingerprint", null) == fingerprint) return
+        val now = System.currentTimeMillis()
+        val lastTime = prefs.getLong("last_received_at", 0L)
+        if (prefs.getString("last_fingerprint", null) == fingerprint &&
+            now >= lastTime && now - lastTime < 120_000L) return
         val values = ContentValues().apply {
             put(Telephony.Sms.ADDRESS, sender)
             put(Telephony.Sms.BODY, body)
@@ -35,7 +38,7 @@ class SmsReceiver : BroadcastReceiver() {
         try {
             val saved = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
             if (saved == null) return
-            prefs.edit().putString("last_fingerprint", fingerprint).apply()
+            prefs.edit().putString("last_fingerprint", fingerprint).putLong("last_received_at", now).apply()
         } catch (_: Exception) {
             return
         }
