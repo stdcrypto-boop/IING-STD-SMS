@@ -12,6 +12,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Bundle
+import android.provider.ContactsContract
 import android.provider.Telephony
 import android.text.TextUtils
 import android.text.format.DateUtils
@@ -37,6 +38,7 @@ class MainActivity : Activity() {
     private var refreshGeneration = 0
     private data class Conversation(val address: String, val body: String, val date: Long, val unread: Boolean)
     private val blue = Color.rgb(37, 211, 102)
+    private val contactNames = mutableMapOf<String, String>()
     private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(radius).toFloat()
@@ -240,6 +242,10 @@ class MainActivity : Activity() {
         val required = listOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS)
         val missing = required.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) { requestPermissions(missing.toTypedArray(), 1); return }
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.READ_CONTACTS), 6)
+            return
+        }
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4)
@@ -247,7 +253,7 @@ class MainActivity : Activity() {
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if ((requestCode == 1 || requestCode == 4) && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) requestNextPermission()
+        if ((requestCode == 1 || requestCode == 4 || requestCode == 6) && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) requestNextPermission()
         refresh()
     }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -279,6 +285,20 @@ class MainActivity : Activity() {
         // Read the SMS provider off the UI thread. Rebuild views only for the latest result.
         Thread {
             val conversations = mutableListOf<Conversation>()
+            val names = mutableMapOf<String, String>()
+            if (checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                try {
+                    contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME),
+                        null, null, null)?.use { c ->
+                        while (c.moveToNext()) {
+                            val number = c.getString(0).orEmpty()
+                            val name = c.getString(1).orEmpty()
+                            if (name.isNotBlank()) names[keyFor(number)] = name
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
             var error = false
             try {
                 val seen = HashSet<String>()
@@ -299,6 +319,8 @@ class MainActivity : Activity() {
                     Toast.makeText(this@MainActivity, "Gagal memuat SMS", Toast.LENGTH_SHORT).show()
                     return@runOnUiThread
                 }
+                contactNames.clear()
+                contactNames.putAll(names)
                 list.removeAllViews()
                 visibleConversations.clear()
                 conversations.forEach { conversation ->
