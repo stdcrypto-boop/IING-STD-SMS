@@ -16,6 +16,7 @@ import android.graphics.Typeface
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import android.provider.ContactsContract
 import android.provider.Telephony
 import android.telephony.PhoneNumberUtils
 import android.telephony.SmsManager
@@ -57,6 +58,7 @@ class ComposeActivity : Activity() {
         }
         startActivityForResult(Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName),22)
     }
+    private var numberInput: EditText? = null
     private var currentAddress = ""
     private var messageList: LinearLayout? = null
     private var historyScroll: ScrollView? = null
@@ -83,6 +85,18 @@ class ComposeActivity : Activity() {
         super.onPause()
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 71 && resultCode == RESULT_OK) {
+            data?.data?.let { uri ->
+                try {
+                    contentResolver.query(uri, arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) numberInput?.setText(c.getString(0))
+                    }
+                } catch (_: Exception) { Toast.makeText(this, "Gagal membaca nomor kontak", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -114,7 +128,19 @@ class ComposeActivity : Activity() {
         number.setTextColor(Color.WHITE); number.setHintTextColor(Color.rgb(135,156,165))
         number.setPadding(dp(14),dp(10),dp(14),dp(10))
         number.textSize=16f
-        root.addView(number,LinearLayout.LayoutParams(-1,dp(52)).apply { bottomMargin=dp(8) })
+        numberInput = number
+        val recipientRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        recipientRow.addView(number, LinearLayout.LayoutParams(0, dp(52), 1f))
+        recipientRow.addView(Button(this).apply {
+            text = "Kontak"
+            isAllCaps = false
+            setOnClickListener {
+                try {
+                    startActivityForResult(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI), 71)
+                } catch (_: Exception) { Toast.makeText(this@ComposeActivity, "Pemilih kontak tidak tersedia", Toast.LENGTH_SHORT).show() }
+            }
+        }, LinearLayout.LayoutParams(dp(100), dp(52)))
+        root.addView(recipientRow,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = dp(8) })
         val simChoices = mutableListOf<Pair<String,Int>>()
         val simSpinner = Spinner(this)
         val subscriptionManager = getSystemService(SubscriptionManager::class.java)
