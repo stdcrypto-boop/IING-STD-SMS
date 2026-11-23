@@ -13,9 +13,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: gradle --no-daemon assembleDebug
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: IING-STD-SMS-debug
           path: app/build/outputs/apk/debug/*.apk
