@@ -7,7 +7,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -62,3 +62,20 @@ jobs:
           name: IING-STD-SMS-signed-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Prepare directly downloadable APK
+        shell: bash
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk IING-STD-SMS.apk
+      - name: Publish APK directly in GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="sms-build-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" IING-STD-SMS.apk \
+            --title "IING STD SMS build ${GITHUB_RUN_NUMBER}" \
+            --notes "APK release bertanda tangan. Unduh IING-STD-SMS.apk langsung tanpa ekstrak ZIP. Build commit ${GITHUB_SHA}." \
+            --target "$GITHUB_SHA" \
+            --latest
