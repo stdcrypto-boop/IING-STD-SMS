@@ -12,6 +12,9 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.telephony.SubscriptionManager
+import android.telephony.SubscriptionInfo
+import android.os.Build
 import android.text.util.Linkify
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -27,6 +30,21 @@ class ComposeActivity : Activity() {
         root.addView(header)
         val number=EditText(this).apply { hint="Nomor tujuan"; setSingleLine(true); setText(intent.getStringExtra("address") ?: intent.data?.schemeSpecificPart ?: "") }
         root.addView(number)
+        val simChoices = mutableListOf<Pair<String,Int>>()
+        val simSpinner = Spinner(this)
+        val subscriptionManager = getSystemService(SubscriptionManager::class.java)
+        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                subscriptionManager.activeSubscriptionInfoList?.forEach { info ->
+                    simChoices.add("SIM ${info.simSlotIndex + 1} — ${info.displayName}" to info.subscriptionId)
+                }
+            } catch (_: SecurityException) {}
+        }
+        if (simChoices.isEmpty()) {
+            simChoices.add("SIM default Android" to SubscriptionManager.getDefaultSmsSubscriptionId())
+        }
+        simSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, simChoices.map { it.first })
+        root.addView(simSpinner)
         val history=ScrollView(this)
         val messages=LinearLayout(this).apply { orientation=1 }
         history.addView(messages)
@@ -53,7 +71,17 @@ class ComposeActivity : Activity() {
                 }
                 val uri = contentResolver.insert(Telephony.Sms.Outbox.CONTENT_URI,values)
                     ?: throw IllegalStateException("Tidak bisa menyimpan SMS")
-                val manager=SmsManager.getDefault()
+                val selectedId = simChoices[simSpinner.selectedItemPosition].second
+                if (selectedId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    Toast.makeText(this@ComposeActivity,"Pilih SIM SMS default di pengaturan HP",Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                val manager = if (Build.VERSION.SDK_INT >= 31) {
+                    getSystemService(SmsManager::class.java).createForSubscriptionId(selectedId)
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getSmsManagerForSubscriptionId(selectedId)
+                }
                 val parts=manager.divideMessage(message)
                 val token=UUID.randomUUID().toString()
                 val callbacks=ArrayList<PendingIntent>()
@@ -85,12 +113,18 @@ class ComposeActivity : Activity() {
                 val outgoing = c.getInt(1) != Telephony.Sms.MESSAGE_TYPE_INBOX
                 val messageText = c.getString(0) ?: ""
                 val date = DateFormat.format("HH:mm", c.getLong(2)).toString()
+                val status = when (c.getInt(1)) {
+                    Telephony.Sms.MESSAGE_TYPE_SENT -> " • Terkirim"
+                    Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal"
+                    Telephony.Sms.MESSAGE_TYPE_OUTBOX -> " • Mengirim"
+                    else -> ""
+                }
                 val bubble = GradientDrawable().apply {
                     setColor(if(outgoing) Color.rgb(211,226,255) else Color.WHITE)
                     cornerRadius = 32f
                 }
                 val item=TextView(this).apply {
-                    text="$messageText\n$date"
+                    text="$messageText\n$date$status"
                     textSize=16f
                     setTextColor(Color.rgb(25,35,55))
                     setPadding(22,16,22,16)
