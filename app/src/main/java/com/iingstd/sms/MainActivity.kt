@@ -34,6 +34,7 @@ class MainActivity : Activity() {
         if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS,Manifest.permission.SEND_SMS),1)
         } else refresh()
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),4)
     }
     override fun onResume() { super.onResume(); if (checkSelfPermission(Manifest.permission.READ_SMS)==PackageManager.PERMISSION_GRANTED) refresh() }
     override fun onRequestPermissionsResult(requestCode:Int, permissions:Array<out String>, grantResults:IntArray) {
