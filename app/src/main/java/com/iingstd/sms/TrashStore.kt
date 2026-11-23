@@ -48,17 +48,40 @@ class TrashStore(private val context: Context) : SQLiteOpenHelper(context, "sms_
         writableDatabase.delete("trash","id=?",arrayOf(backupId.toString()))
         return false
     }
+    /**
+     * Restore into the correct Android SMS box and verify the row is readable
+     * before removing the recovery copy. A failed verification retains the backup.
+     */
     fun restore(id: Long): Boolean {
-        val record=entries().firstOrNull { it.id==id } ?: return false
-        val values=ContentValues().apply {
-            put(Telephony.Sms.ADDRESS,record.address); put(Telephony.Sms.BODY,record.body)
-            put(Telephony.Sms.DATE,record.date); put(Telephony.Sms.TYPE,record.type)
-            put(Telephony.Sms.READ,record.read); put(Telephony.Sms.SEEN,record.seen)
+        val record = entries().firstOrNull { it.id == id } ?: return false
+        val destination = when (record.type) {
+            Telephony.Sms.MESSAGE_TYPE_INBOX -> Telephony.Sms.Inbox.CONTENT_URI
+            Telephony.Sms.MESSAGE_TYPE_SENT -> Telephony.Sms.Sent.CONTENT_URI
+            Telephony.Sms.MESSAGE_TYPE_DRAFT -> Telephony.Sms.Draft.CONTENT_URI
+            Telephony.Sms.MESSAGE_TYPE_OUTBOX -> Telephony.Sms.Outbox.CONTENT_URI
+            Telephony.Sms.MESSAGE_TYPE_FAILED -> Telephony.Sms.CONTENT_URI
+            Telephony.Sms.MESSAGE_TYPE_QUEUED -> Telephony.Sms.CONTENT_URI
+            else -> Telephony.Sms.CONTENT_URI
         }
-        val inserted=context.contentResolver.insert(Telephony.Sms.CONTENT_URI,values) ?: return false
-        if (writableDatabase.delete("trash","id=?",arrayOf(id.toString()))>0) return true
-        // Keep the restored SMS and avoid pretending the trash entry was removed.
-        return inserted.toString().isNotBlank() && false
+        val values = ContentValues().apply {
+            put(Telephony.Sms.ADDRESS, record.address)
+            put(Telephony.Sms.BODY, record.body)
+            put(Telephony.Sms.DATE, record.date)
+            put(Telephony.Sms.TYPE, record.type)
+            put(Telephony.Sms.READ, record.read)
+            put(Telephony.Sms.SEEN, record.seen)
+        }
+        val inserted = context.contentResolver.insert(destination, values) ?: return false
+        val verified = try {
+            context.contentResolver.query(inserted,
+                arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.TYPE),
+                null, null, null)?.use { c ->
+                c.moveToFirst() && c.getString(0).orEmpty() == record.address &&
+                    c.getString(1).orEmpty() == record.body && c.getInt(2) == record.type
+            } == true
+        } catch (_: Exception) { false }
+        if (!verified) return false // Never discard the only recovery copy.
+        return writableDatabase.delete("trash", "id=?", arrayOf(id.toString())) > 0
     }
     fun permanentlyDelete(id:Long):Boolean=writableDatabase.delete("trash","id=?",arrayOf(id.toString()))>0
     fun empty():Int=writableDatabase.delete("trash",null,null)
