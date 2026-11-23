@@ -21,17 +21,17 @@ import android.widget.*
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout
     private lateinit var defaultButton: Button
-    private val blue = Color.rgb(54, 91, 220)
+    private val blue = Color.rgb(37, 211, 102)
     private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
     private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(radius).toFloat()
     }
     private fun gradient(top: Int, bottom: Int, radius: Int = 0) = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(top, bottom)).apply { cornerRadius = dp(radius).toFloat() }
     private fun conversationSurface(unread: Boolean): LayerDrawable {
-        val shadow = rounded(Color.argb(13, 49, 73, 140), 20)
-        val fill = gradient(if (unread) Color.rgb(234, 242, 255) else Color.WHITE,
-            if (unread) Color.rgb(242, 247, 255) else Color.WHITE, 18)
-        fill.setStroke(dp(1), if (unread) Color.rgb(173, 199, 245) else Color.rgb(233, 238, 246))
+        val shadow = rounded(Color.TRANSPARENT, 0)
+        val fill = gradient(if (unread) Color.rgb(28, 45, 48) else Color.rgb(11, 20, 26),
+            if (unread) Color.rgb(28, 45, 48) else Color.rgb(11, 20, 26), 10)
+        fill.setStroke(0, Color.TRANSPARENT)
         return LayerDrawable(arrayOf(shadow, fill)).apply {
             setLayerInset(1, 0, 0, dp(2), dp(3))
         }
@@ -54,25 +54,25 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(248, 250, 255)
+        window.statusBarColor = Color.rgb(11, 20, 26)
         window.navigationBarColor = Color.rgb(248, 250, 255)
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.decorView.systemUiVisibility = 0
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(12))
-            setBackgroundColor(Color.rgb(247, 249, 253))
+            setBackgroundColor(Color.rgb(11, 20, 26))
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(20), dp(20), dp(16))
-            background = gradient(Color.rgb(25, 44, 88), Color.rgb(47, 83, 158), 24)
+            background = gradient(Color.rgb(31, 44, 52), Color.rgb(31, 44, 52), 16)
         }
         header.addView(TextView(this).apply {
             text = "Pesan"; textSize = 30f; setTextColor(Color.WHITE)
             setTypeface(null, Typeface.BOLD)
         })
         header.addView(TextView(this).apply {
-            text = "IING STD  •  MESSENGER"; textSize = 12f; setTextColor(Color.rgb(190, 213, 255))
+            text = "IING STD  •  MESSENGER"; textSize = 12f; setTextColor(Color.rgb(135, 156, 165))
             letterSpacing = .12f; setPadding(0, 0, 0, dp(12))
         })
         header.addView(TextView(this).apply {
@@ -98,14 +98,14 @@ class MainActivity : Activity() {
         }
         section.addView(TextView(this).apply {
             text = "Percakapan"; textSize = 17f
-            setTextColor(Color.rgb(36, 45, 67))
+            setTextColor(Color.WHITE)
             setTypeface(null, Typeface.BOLD)
         }, LinearLayout.LayoutParams(0, -2, 1f))
         section.addView(TextView(this).apply {
             text = "＋  Baru"; textSize = 15f
             setTextColor(Color.WHITE); gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
-            background = gradient(Color.rgb(38, 91, 208), Color.rgb(32, 66, 156), 18)
+            background = gradient(Color.rgb(0, 168, 132), Color.rgb(0, 168, 132), 18)
             setOnClickListener { startActivity(Intent(this@MainActivity, ComposeActivity::class.java)) }
         }, LinearLayout.LayoutParams(dp(100), dp(44)))
         root.addView(section)
@@ -163,7 +163,7 @@ class MainActivity : Activity() {
         if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             list.addView(TextView(this).apply {
                 text = "Izin membaca SMS belum tersedia."
-                textSize = 15f; setTextColor(Color.DKGRAY); setPadding(dp(8), dp(24), 0, 0)
+                textSize = 15f; setTextColor(Color.WHITE); setPadding(dp(8), dp(24), 0, 0)
             })
             return
         }
@@ -182,7 +182,7 @@ class MainActivity : Activity() {
             }
             if (seen.isEmpty()) list.addView(TextView(this).apply {
                 text = "Belum ada percakapan. Ketuk + Baru untuk menulis pesan."
-                textSize = 15f; setPadding(dp(8), dp(30), dp(8), 0)
+                textSize = 15f; setTextColor(Color.WHITE); setPadding(dp(8), dp(30), dp(8), 0)
             })
         } catch (_: SecurityException) {
             Toast.makeText(this, "Izin SMS diperlukan", Toast.LENGTH_SHORT).show()
@@ -193,7 +193,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(13), dp(14), dp(13))
             background = conversationSurface(unread)
-            elevation = dp(1).toFloat()
+            elevation = 0f
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
             }
@@ -202,7 +202,7 @@ class MainActivity : Activity() {
             text = address.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
             textSize = 20f; setTypeface(null, Typeface.BOLD)
             setTextColor(blue); gravity = Gravity.CENTER
-            background = rounded(Color.rgb(231, 237, 255), 50)
+            background = rounded(Color.rgb(36, 65, 62), 50)
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -210,11 +210,11 @@ class MainActivity : Activity() {
         }
         info.addView(TextView(this).apply {
             text = address; textSize = 16f; setTypeface(null, if (unread) Typeface.BOLD else Typeface.NORMAL)
-            setTextColor(Color.rgb(29, 39, 61))
+            setTextColor(Color.WHITE)
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         })
         info.addView(TextView(this).apply {
-            text = body; textSize = 14f; setTextColor(if (unread) Color.rgb(39, 63, 111) else Color.rgb(111, 121, 141))
+            text = body; textSize = 14f; setTextColor(if (unread) Color.rgb(221, 232, 232) else Color.rgb(134, 150, 158))
             maxLines = 2; ellipsize = TextUtils.TruncateAt.END
         })
         row.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
@@ -223,7 +223,7 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(9), dp(9)).apply { rightMargin = dp(6) })
         row.addView(TextView(this).apply {
             text = DateUtils.getRelativeTimeSpanString(date, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
-            textSize = 11f; setTextColor(Color.GRAY); maxLines = 1
+            textSize = 11f; setTextColor(Color.rgb(134,150,158)); maxLines = 1
         })
         list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
     }
