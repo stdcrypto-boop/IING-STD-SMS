@@ -31,16 +31,30 @@ class MainActivity : Activity() {
         scroll.addView(list)
         root.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root)
-        if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS,Manifest.permission.SEND_SMS),1)
-        } else refresh()
-        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE),5)
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),4)
+        requestNextPermission()
     }
-    override fun onResume() { super.onResume(); if (checkSelfPermission(Manifest.permission.READ_SMS)==PackageManager.PERMISSION_GRANTED) refresh() }
+    override fun onResume() {
+        super.onResume()
+        if (::list.isInitialized && checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) refresh()
+    }
+    private fun requestNextPermission() {
+        val required = listOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS)
+        val missingSms = required.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missingSms.isNotEmpty()) {
+            requestPermissions(missingSms.toTypedArray(), 1)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4)
+            return
+        }
+        refresh()
+    }
     override fun onRequestPermissionsResult(requestCode:Int, permissions:Array<out String>, grantResults:IntArray) {
         super.onRequestPermissionsResult(requestCode,permissions,grantResults)
-        refresh()
+        if ((requestCode == 1 || requestCode == 4) && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) requestNextPermission()
+        else if (::list.isInitialized) refresh()
     }
     private fun requestDefault() {
         if (Build.VERSION.SDK_INT >= 29) {
