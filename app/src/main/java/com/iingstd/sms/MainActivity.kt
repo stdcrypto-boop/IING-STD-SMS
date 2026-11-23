@@ -80,6 +80,11 @@ class MainActivity : Activity() {
             setPadding(0,dp(5),0,dp(8))
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         })
+        header.addView(TextView(this).apply {
+            text="▤  Tempat Sampah"; textSize=14f; setTextColor(Color.WHITE)
+            setPadding(0,dp(7),0,dp(5))
+            setOnClickListener { startActivity(Intent(this@MainActivity,TrashActivity::class.java)) }
+        })
         root.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         defaultButton = Button(this).apply {
             text = "Aktifkan sebagai aplikasi SMS utama"
