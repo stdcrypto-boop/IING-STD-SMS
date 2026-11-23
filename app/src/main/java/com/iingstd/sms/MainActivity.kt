@@ -75,6 +75,11 @@ class MainActivity : Activity() {
             text = "IING STD SMS"; textSize = 12f; setTextColor(blue)
             letterSpacing = .12f; setPadding(0, 0, 0, dp(12))
         })
+        header.addView(TextView(this).apply {
+            text="⚙  Pengaturan & Diagnostik"; textSize=14f; setTextColor(blue)
+            setPadding(0,dp(5),0,dp(8))
+            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+        })
         root.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         defaultButton = Button(this).apply {
             text = "Aktifkan sebagai aplikasi SMS utama"
