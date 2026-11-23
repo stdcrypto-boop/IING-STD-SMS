@@ -39,6 +39,10 @@ class ComposeActivity : Activity() {
         contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, smsObserver)
         messageList?.let { if (currentAddress.isNotBlank()) loadHistory(currentAddress, it) }
     }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 5 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) recreate()
+    }
     override fun onPause() {
         contentResolver.unregisterContentObserver(smsObserver)
         super.onPause()
@@ -68,6 +72,14 @@ class ComposeActivity : Activity() {
         val defaultSimIndex = simChoices.indexOfFirst { it.second == SubscriptionManager.getDefaultSmsSubscriptionId() }
         if (defaultSimIndex >= 0) simSpinner.setSelection(defaultSimIndex)
         root.addView(simSpinner)
+        if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            root.addView(Button(this).apply {
+                text = "Aktifkan pilihan SIM 1 / SIM 2"
+                setOnClickListener {
+                    requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE), 5)
+                }
+            })
+        }
         val history=ScrollView(this)
         val messages=LinearLayout(this).apply { orientation=1 }
         history.addView(messages)
