@@ -201,15 +201,24 @@ class ComposeActivity : Activity() {
         setContentView(root)
         loadHistory(number.text.toString(),messages)
     }
+    private fun normalized(address:String):String {
+        val digits=address.filter { it.isDigit() }
+        return when {
+            digits.startsWith("62") && digits.length>=10 -> "0"+digits.drop(2)
+            digits.startsWith("0") && digits.length>=9 -> digits
+            else -> address.trim().uppercase()
+        }
+    }
     private fun loadHistory(address:String,layout:LinearLayout) {
         layout.removeAllViews()
         if(address.isBlank() || checkSelfPermission(Manifest.permission.READ_SMS)!=PackageManager.PERMISSION_GRANTED) return
-        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("body","type","date"),"address = ?",arrayOf(address),"date ASC")?.use { c ->
+        contentResolver.query(Telephony.Sms.CONTENT_URI,arrayOf("address","body","type","date"),null,null,"date ASC")?.use { c ->
             while(c.moveToNext()) {
-                val outgoing = c.getInt(1) != Telephony.Sms.MESSAGE_TYPE_INBOX
-                val messageText = c.getString(0) ?: ""
-                val date = DateFormat.format("HH:mm", c.getLong(2)).toString()
-                val status = when (c.getInt(1)) {
+                if (normalized(c.getString(0).orEmpty()) != normalized(address)) continue
+                val outgoing = c.getInt(2) != Telephony.Sms.MESSAGE_TYPE_INBOX
+                val messageText = c.getString(1) ?: ""
+                val date = DateFormat.format("HH:mm", c.getLong(3)).toString()
+                val status = when (c.getInt(2)) {
                     Telephony.Sms.MESSAGE_TYPE_SENT -> " • Terkirim"
                     Telephony.Sms.MESSAGE_TYPE_FAILED -> " • Gagal"
                     Telephony.Sms.MESSAGE_TYPE_OUTBOX -> " • Mengirim"
