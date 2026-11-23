@@ -26,7 +26,6 @@ class SentReceiver : BroadcastReceiver() {
             val uri = Uri.parse(messageUri)
             val values = ContentValues().apply {
                 put(Telephony.Sms.TYPE,if(failed) Telephony.Sms.MESSAGE_TYPE_FAILED else Telephony.Sms.MESSAGE_TYPE_SENT)
-                put(Telephony.Sms.STATUS,if(failed) Telephony.Sms.STATUS_FAILED else Telephony.Sms.STATUS_NONE)
             }
             context.contentResolver.update(uri,values,null,null)
         } catch (_: Exception) {
