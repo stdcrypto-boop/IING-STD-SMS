@@ -26,9 +26,9 @@ class TrashActivity : Activity() {
     }
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
-        val root=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(18),dp(18),dp(12)); setBackgroundColor(Color.rgb(247,249,253)) }
-        root.addView(TextView(this).apply { text="‹  Tempat Sampah"; textSize=25f; setTypeface(null,Typeface.BOLD); setTextColor(Color.rgb(27,48,95)); setOnClickListener { finish() } })
-        root.addView(TextView(this).apply { text="SMS yang dihapus melalui IING STD SMS disimpan hingga 30 hari. Data lama dibersihkan saat halaman ini atau fitur sampah diakses."; textSize=13f; setPadding(0,dp(10),0,dp(12)) })
+        val root=LinearLayout(this).apply { orientation=1; setPadding(dp(18),dp(18),dp(18),dp(12)); setBackgroundColor(Color.rgb(11,20,26)) }
+        root.addView(TextView(this).apply { text="‹  Tempat Sampah"; textSize=25f; setTypeface(null,Typeface.BOLD); setTextColor(Color.WHITE); setOnClickListener { finish() } })
+        root.addView(TextView(this).apply { text="SMS yang dihapus melalui IING STD SMS disimpan hingga 30 hari. Data lama dibersihkan saat halaman ini atau fitur sampah diakses."; textSize=13f; setTextColor(Color.rgb(170,185,190)); setPadding(0,dp(10),0,dp(12)) })
         root.addView(Button(this).apply { text="Kosongkan Tempat Sampah"; isAllCaps=false; setOnClickListener {
             AlertDialog.Builder(this@TrashActivity).setTitle("Hapus semua secara permanen?")
                 .setMessage("Semua pesan di Tempat Sampah akan hilang dan tidak bisa dipulihkan.")
@@ -44,12 +44,12 @@ class TrashActivity : Activity() {
     private fun refresh() {
         list.removeAllViews()
         val entries=store.entries()
-        if(entries.isEmpty()) list.addView(TextView(this).apply { text="Tempat Sampah kosong"; textSize=16f; setPadding(0,dp(24),0,0) })
+        if(entries.isEmpty()) list.addView(TextView(this).apply { text="Tempat Sampah kosong"; textSize=16f; setTextColor(Color.WHITE); setPadding(0,dp(24),0,0) })
         entries.forEach { e ->
             val row=LinearLayout(this).apply { orientation=1; setPadding(dp(12),dp(12),dp(12),dp(12)) }
-            row.addView(TextView(this).apply { text=e.address; textSize=16f; setTypeface(null,Typeface.BOLD) })
-            row.addView(TextView(this).apply { text=e.body; textSize=14f; maxLines=3 })
-            row.addView(TextView(this).apply { text="Dihapus: "+DateFormat.getDateTimeInstance().format(Date(e.deletedAt)); textSize=12f })
+            row.addView(TextView(this).apply { text=e.address; textSize=16f; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD) })
+            row.addView(TextView(this).apply { text=e.body; textSize=14f; setTextColor(Color.rgb(220,230,231)); maxLines=3 })
+            row.addView(TextView(this).apply { text="Dihapus: "+DateFormat.getDateTimeInstance().format(Date(e.deletedAt)); textSize=12f; setTextColor(Color.rgb(145,160,165)) })
             val actions=LinearLayout(this)
             actions.addView(Button(this).apply { text="Pulihkan"; isAllCaps=false; setOnClickListener {
                 if(!isDefault()) { Toast.makeText(this@TrashActivity,"Jadikan IING STD SMS aplikasi utama sebelum memulihkan",Toast.LENGTH_LONG).show(); return@setOnClickListener }
@@ -65,7 +65,7 @@ class TrashActivity : Activity() {
             } },LinearLayout.LayoutParams(0,dp(48),1f))
             row.addView(actions)
             list.addView(row)
-            list.addView(View(this).apply { setBackgroundColor(Color.rgb(225,231,242)) },LinearLayout.LayoutParams(-1,dp(1)))
+            list.addView(View(this).apply { setBackgroundColor(Color.rgb(45,62,69)) },LinearLayout.LayoutParams(-1,dp(1)))
         }
     }
 }
