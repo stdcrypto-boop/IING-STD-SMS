@@ -132,13 +132,14 @@ class MainActivity : Activity() {
         val seen = mutableSetOf<String>()
         try {
             contentResolver.query(Telephony.Sms.CONTENT_URI,
-                arrayOf("address", "body", "date"), null, null, "date DESC")?.use { cursor ->
+                arrayOf("address", "body", "date", "read", "type"), null, null, "date DESC")?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val address = cursor.getString(0) ?: "Tidak dikenal"
                     if (!seen.add(address)) continue
                     val body = cursor.getString(1).orEmpty()
                     val date = cursor.getLong(2)
-                    addConversation(address, body, date)
+                    val unread = cursor.getInt(4) == Telephony.Sms.MESSAGE_TYPE_INBOX && cursor.getInt(3) == 0
+                    addConversation(address, body, date, unread)
                 }
             }
             if (seen.isEmpty()) list.addView(TextView(this).apply {
@@ -149,11 +150,11 @@ class MainActivity : Activity() {
             Toast.makeText(this, "Izin SMS diperlukan", Toast.LENGTH_SHORT).show()
         }
     }
-    private fun addConversation(address: String, body: String, date: Long) {
+    private fun addConversation(address: String, body: String, date: Long, unread: Boolean) {
         val row = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(14), dp(12), dp(14))
-            background = rounded(Color.WHITE, 18)
+            background = rounded(if (unread) Color.rgb(228, 238, 255) else Color.WHITE, 18)
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ComposeActivity::class.java).putExtra("address", address))
             }
@@ -169,15 +170,18 @@ class MainActivity : Activity() {
             setPadding(dp(12), 0, dp(8), 0)
         }
         info.addView(TextView(this).apply {
-            text = address; textSize = 16f; setTypeface(null, Typeface.BOLD)
+            text = address; textSize = 16f; setTypeface(null, if (unread) Typeface.BOLD else Typeface.NORMAL)
             setTextColor(Color.rgb(29, 39, 61))
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         })
         info.addView(TextView(this).apply {
-            text = body; textSize = 14f; setTextColor(Color.rgb(111, 121, 141))
+            text = body; textSize = 14f; setTextColor(if (unread) Color.rgb(39, 63, 111) else Color.rgb(111, 121, 141))
             maxLines = 2; ellipsize = TextUtils.TruncateAt.END
         })
         row.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+        if (unread) row.addView(View(this).apply {
+            background = rounded(blue, 20)
+        }, LinearLayout.LayoutParams(dp(9), dp(9)).apply { rightMargin = dp(6) })
         row.addView(TextView(this).apply {
             text = DateUtils.getRelativeTimeSpanString(date, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
             textSize = 11f; setTextColor(Color.GRAY); maxLines = 1
